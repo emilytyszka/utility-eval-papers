@@ -13,7 +13,7 @@ The analysis here uses a pipeline-based workflow implemented with [the `targets`
   
 ## Running Analysis
 From an R console at the project root, 
-1. `source(_targets.R)`
+1. `source("_targets.R")`
 1. `tar_make()` (this could take a while, e.g., ~20 minutes on an M2 Mac)
 
 The objects required to knit `./alloscore_manuscript/manuscript.Rnw` should now reside in
