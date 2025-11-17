@@ -9,11 +9,11 @@ plot_allocation_forecasts <- function(forecast_data, truth_data, loc_abbr, tar_d
     filter(abbreviation == loc_abbr, quantile == 0.5) |>
     ggplot(aes(x=target_end_date, y= value)) +
     geom_point(alpha=.3) +
-    geom_point(data=filter(truth_data, location=="25", target_end_date <= as.Date("2022-03-15"), target_end_date >= as.Date("2021-12-01")),
+    geom_point(data=filter(truth_data, location=="06", target_end_date <= as.Date("2021-02-06"), target_end_date >= as.Date("2021-02-13")),
                aes(x=target_end_date), shape=4) +
     xlab(NULL) +
-    ylab("New hospital admissions") +
-    ggtitle(paste("Observed and forecasted hospital admissions in", loc_abbr))
+    ylab("New cases") +
+    ggtitle(paste("Observed and forecasted cases in", loc_abbr))
 
 
   qtiles <- as.character(c((1-intervals)/2, 1-(1-intervals)/2))

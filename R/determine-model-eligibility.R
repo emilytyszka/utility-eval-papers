@@ -7,13 +7,15 @@ determine_eligible_models <- function(forecast_dates, locations){
   models_to_drop <- c("COVIDhub-4_week_ensemble", "COVIDhub_CDC-ensemble",
                       "CU-nochange", "CU-scenario_low", "CU-scenario_mid")
 
+  models_to_include <- c("CEID-Walk", "COVIDhub-4_week_ensemble", "COVIDhub-baseline", "CU-select", "FAIR-NRAR",  "IowaStateLW-STEM", "JHU_IDD-CovidSP", "JHUAPL-Bucky", "LANL-GrowthRate", "LNQ-ens1", "OneQuietNight-ML", "UChicagoCHATTOPADHYAY-UnIT")  
+ 
   ## load and filter forecasts
   load_forecasts(
     dates = forecast_dates,
     date_window_size = 6,
     types = c("quantile"),
     ## need to make sure we are getting everyone's relative 14th horizon
-    targets = paste(14:20, "day ahead inc hosp"),
+    targets = paste(1:6, "wk ahead inc case"),
     locations = locations,
     source = "zoltar",
     verbose = FALSE,
@@ -21,8 +23,8 @@ determine_eligible_models <- function(forecast_dates, locations){
     hub = c("US")) |>
     align_forecasts() |>
     dplyr::filter(
-      !(model %in% models_to_drop),
-      relative_horizon == 14
+      (model %in% models_to_include)#,
+      #relative_horizon == 14
     ) |>
     group_by(model, reference_date) |>
     summarize(nlocs = length(unique(location_name))) |>

@@ -1,26 +1,29 @@
+models_to_include <- c("CEID-Walk", "COVIDhub-4_week_ensemble", "COVIDhub-baseline", "CU-select", "FAIR-NRAR",  "IowaStateLW-STEM", "JHU_IDD-CovidSP", "JHUAPL-Bucky", "LANL-GrowthRate", "LNQ-ens1", "OneQuietNight-ML", "UChicagoCHATTOPADHYAY-UnIT")  
+
 get_forecast_data <- function(forecast_dates, models, locations){
   require(covidHubUtils)
   load_forecasts(
     dates = forecast_dates,
     date_window_size = 6,
-    models = models,
+    models = models_to_include,
     locations = locations,
     types = c("quantile"),
-    targets = paste(14:20, "day ahead inc hosp"),
+    targets = paste(1:6, "wk ahead inc case"),
     source = "zoltar",
     verbose = FALSE,
     as_of = NULL,
     hub = c("US")) |>
-    align_forecasts() |>
-    dplyr::filter(relative_horizon == 14)
+    align_forecasts() #|>
+    #dplyr::filter(relative_horizon == 14)
 }
 
 get_truth_data <- function(){
   require(covidHubUtils)
   load_truth(
-    truth_source = "HealthData",
-    target_variable = "inc hosp"
-  )
+    truth_source = "JHU",
+    target_variable = "inc case"
+  ) %>%
+    dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA")) & value >= 0 | geo_type == "state" & (abbreviation %in% c("CA")) & value >= 0)
 }
 
 
