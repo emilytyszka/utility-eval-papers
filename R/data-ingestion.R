@@ -23,7 +23,8 @@ get_truth_data <- function(){
     truth_source = "JHU",
     target_variable = "inc case"
   ) %>%
-    dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA")) & value >= 0 | geo_type == "state" & (abbreviation %in% c("CA")) & value >= 0)
+    dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA")) | geo_type == "state" & (abbreviation %in% c("CA"))) %>%
+    dplyr::mutate(value = pmax(value, 0))
 }
 
 
