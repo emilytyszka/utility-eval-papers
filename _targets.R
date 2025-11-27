@@ -61,20 +61,20 @@ setup <- list(
   tar_target(
     name = exponential_example,
     command = make_exponential_example_figure()
-  # ),
-  # tar_target(
-  #   name = Kat15k_alloscores,
-  #   command = run_and_assemble_alloscores(forecast_data,
-  #                                         truth_data,
-  #                                         reference_dates = values$forecast_dates,
-  #                                         one_K = 15000)
-  # ),
-  # tar_target(
-  #   name = pops22,
-  #   command = readr::read_csv("https://www2.census.gov/programs-surveys/popest/datasets/2020-2022/state/totals/NST-EST2022-ALLDATA.csv") |> 
-  #     dplyr::select(full_location_name = NAME, POPESTIMATE2021) |>
-  #     dplyr::inner_join(hub_locations, by = join_by(full_location_name))
-  # )
+  ),
+  tar_target(
+    name = Kat15k_alloscores,
+    command = run_and_assemble_alloscores(forecast_data,
+                                          truth_data,
+                                          reference_dates = values$forecast_dates,
+                                          one_K = 15000)
+  ),
+  tar_target(
+    name = pops22,
+    command = readr::read_csv("https://www2.census.gov/programs-surveys/popest/datasets/2020-2022/state/totals/NST-EST2022-ALLDATA.csv") |>
+      dplyr::select(full_location_name = NAME, POPESTIMATE2021) |>
+      dplyr::inner_join(hub_locations, by = join_by(full_location_name))
+  )
 )
 
 ## from Ben's "overk" analysis

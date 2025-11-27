@@ -25,6 +25,8 @@ truth_data|stem|a218fde3bc6f1413|ce02bc7001733eee|496a0573bc1107e6|1269992088||t
 eligible_models|stem|6cb0341277a17ff7|1f6c1681c0871fe7|f8297a3f292e090b|1035057949||t20412.6675834354s|s46b|46|rds|local|vector|||76.699||
 forecast_data|stem|b138a499bfe39e49|d9c24e1615a75e56|159b086c104b4a96|-1655811718||t20412.6677536788s|s303086b|303086|rds|local|vector|||14.622||
 Kat15k_alloscores|stem|6d7416bf23c4f627|4d6fe3458d991b1a|839f1003157b246d|-1375452427||t19930.592062177s||141427|rds|local|vector|||1.673||ℹ In index: 1. Caused by error in `map()`: ℹ In index: 1. Caused by error in `map()`: ℹ In index: 1. Caused by error in `bind_cols()`: ! Can't recycle `..1` (size 55696) to match `y` (size 236).
+score_data|stem|82ec7e2724c42754|8c0836b4ae9e6dfa|d9ad86b948d3a9c7|1357706333||t20412.6728727249s|s173400b|173400|rds|local|vector|||3.744||
+alloscore_2021.02.06|stem||9d18dbf2640b67a9|6ee7a841036c11da|1001568613||t20409.6826993021s||0|rds|local|vector|||402.417||ℹ In index: 1. Caused by error in `map()`: ℹ In index: 1. Caused by error in `bind_cols()`: ! Can't recycle `..1` (size 16708800) to match `y` (size 70800).
 get_derivative|function|b00754d2f295e19a
 make_K_grid|function|cbc1684b94e21f56
 pdqr_factory|function|42836b9984aac353
@@ -92,5 +94,4 @@ oracle_allocate|function|dc56db6d21c48f93
 alloscore.default|function|04427ffb0b027d60
 oracle_alloscore|function|6691e5ebb9f45de7
 alloscore.allocated|function|ea7d5b6e855a9eed
-score_data|stem|82ec7e2724c42754|8c0836b4ae9e6dfa|d9ad86b948d3a9c7|1357706333||t20412.6728727249s|s173400b|173400|rds|local|vector|||3.744||
-alloscore_2021.02.06|stem||9d18dbf2640b67a9|6ee7a841036c11da|1001568613||t20409.6826993021s||0|rds|local|vector|||402.417||ℹ In index: 1. Caused by error in `map()`: ℹ In index: 1. Caused by error in `bind_cols()`: ! Can't recycle `..1` (size 16708800) to match `y` (size 70800).
+alloscore_2021.02.13|stem||da3bd3cfab4c64fd|6ee7a841036c11da|314950346||t20419.6208985932s||0|rds|local|vector|||854.781||ℹ In index: 5. Caused by error in `map()`: ℹ In index: 1. Caused by error in `bind_cols()`: ! Can't recycle `..1` (size 16147200) to match `y` (size 69600).
