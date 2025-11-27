@@ -16,13 +16,17 @@ alloscore_2022.02.07|stem|ba0b4d8af0c97fce|2ed690d181921deb|fa7a288aa68e8bbc|-13
 alloscore_2022.02.14|stem|96e65a6bcad3f0b8|078bf322a7ef696e|fa7a288aa68e8bbc|453701239||t19930.589643971s|e87ddde48921aae3|1045126|rds|local|vector|||250.956||
 alloscore_2022.02.21|stem|bca8f1a5a94b8d98|af268e2020a918da|fa7a288aa68e8bbc|489289177||t19930.5920672684s|bfc53f2fd3729a09|777280|rds|local|vector|||208.317||
 alloscore_2022.02.28|stem|09d46883743ae6ae|cfe6577e316004eb|fa7a288aa68e8bbc|-1283256265||t19930.5918515622s|630d8dc80a89e9e5|507276|rds|local|vector|||145.18||
-Kat15k_alloscores|stem|6d7416bf23c4f627|4d6fe3458d991b1a|5f6564459cbb4f7c|-1375452427||t19930.592062177s|223a5e76bb37a4cd|141427|rds|local|vector|||154.167||
 mapped|object|3f986b822048f52e|||||||||||||||
 percap|stem|4935cdbfca7ed58d|21e5f47478cc3b24|2c67e49f41cdb605|-773127636||t19930.5922018618s|ab887ec06796f07f|3126319|rds|local|vector|||5.807||
-score_data|stem|cb2a07415a981640|8c0836b4ae9e6dfa|80d6074ebebec1bd|1357706333||t19930.5750823277s|3ebef8c2de33813d|330887|rds|local|vector|||17.911||
 setup|object|0352a3d3881c799d|||||||||||||||
+pops22|stem|3553ba3781caec0c|b3ea8f53c98c0695|60634373c0a29a0a|-1385258444||t20412.6667034545s|s1638b|1638|rds|local|vector|||0.706||
+exponential_example|stem|235d9ea2980bb8ee|fb36eb4d3da0d075|a6320d3fff779e45|-1439913131||t20412.666707534s|s78b|78|rds|local|vector|||1.006||
+truth_data|stem|a218fde3bc6f1413|ce02bc7001733eee|496a0573bc1107e6|1269992088||t20412.6667836454s|s30732b|30732|rds|local|vector|||7.668||
+eligible_models|stem|6cb0341277a17ff7|1f6c1681c0871fe7|f8297a3f292e090b|1035057949||t20412.6675834354s|s46b|46|rds|local|vector|||76.699||
+forecast_data|stem|b138a499bfe39e49|d9c24e1615a75e56|159b086c104b4a96|-1655811718||t20412.6677536788s|s303086b|303086|rds|local|vector|||14.622||
+Kat15k_alloscores|stem|6d7416bf23c4f627|4d6fe3458d991b1a|839f1003157b246d|-1375452427||t19930.592062177s||141427|rds|local|vector|||1.673||ℹ In index: 1. Caused by error in `map()`: ℹ In index: 1. Caused by error in `map()`: ℹ In index: 1. Caused by error in `bind_cols()`: ! Can't recycle `..1` (size 55696) to match `y` (size 236).
 get_derivative|function|b00754d2f295e19a
-make_K_grid|function|5672b5cfd9992b9d
+make_K_grid|function|cbc1684b94e21f56
 pdqr_factory|function|42836b9984aac353
 slim|function|9c70a27f6a29a99c
 normalize_col_names|function|b4717b83813b301e
@@ -48,7 +52,7 @@ filter_problematic_data|function|d5a5113b26cd6f10
 assemble_alloscores|function|49511f49f75e80be
 oracle_allocate_direct|function|ea8788fe58121b32
 determine_eligible_models|function|3e1b1985c96c5141
-get_truth_data|function|eb05955ff05a2911
+get_truth_data|function|7cc2e9e1b486d351
 plot_iterations|function|3455155cdb0bd7fd
 stdize_ou_params|function|acba74f0adff2c49
 values|object|2780d05a5c7ce454
@@ -60,7 +64,7 @@ zxh_tab3|object|6e68cb91d6c749c6
 hub_locations|object|0da64b695031bca2
 dexp_under_loss|function|ad78f132daaf81ef
 dexp_over_loss|function|4bf0ee3f7cdc85f0
-score_per_capita_allocation|function|fc30370fb65be723
+score_per_capita_allocation|function|5d0730cddb2c3cae
 add_pdqr_funs|function|b7ac86eccbe9ef83
 plot_scores_slim|function|df179c43b436b0b6
 post_process|function|dbc3613acec3a159
@@ -74,23 +78,19 @@ plot_hosp|function|3bb8d421a4a01528
 oracle_alloscore_direct|function|fc14099e831a5c1f
 plot_components.default|function|b1df7b6c68d9a783
 dexp_gpl_loss|function|a2c265b64b24db22
-run_alloscore|function|bd47f8777981d0aa
+run_alloscore|function|34180d7bf8fc9c84
 gpl_loss_fun|function|e52a94429036c236
 plot_thermo|function|c95018d0c376839e
 alloscore.slim|function|d1b37fee97091518
 dexp_gpl_df|function|2ea3d652a63b4593
-run_alloscore_one_date|function|6dc9c03a84d58a14
+run_alloscore_one_date|function|f1a804df77813fb5
 new_gpl_df|function|0dcf69036cb26021
 meb_gpl_df|function|f4fbb59d4c7411c3
-run_and_assemble_alloscores|function|7f417c6cec6d24f2
+run_and_assemble_alloscores|function|087e82ad46fdfe69
 allocate|function|cd519aebb8c12cfb
 oracle_allocate|function|dc56db6d21c48f93
 alloscore.default|function|04427ffb0b027d60
 oracle_alloscore|function|6691e5ebb9f45de7
 alloscore.allocated|function|ea7d5b6e855a9eed
-pops22|stem|3553ba3781caec0c|b3ea8f53c98c0695|60634373c0a29a0a|-1385258444||t20409.6815776874s|s1638b|1638|rds|local|vector|||1.566||
-exponential_example|stem|235d9ea2980bb8ee|fb36eb4d3da0d075|a6320d3fff779e45|-1439913131||t20409.6815843541s|s78b|78|rds|local|vector|||2.065||
-truth_data|stem|817343f391a2df98|ce02bc7001733eee|7b7ec96644acb634|1269992088||t20409.6816888624s|s30707b|30707|rds|local|vector|||11.233||
-eligible_models|stem|6cb0341277a17ff7|1f6c1681c0871fe7|f8297a3f292e090b|1035057949||t20409.6824880711s|s46b|46|rds|local|vector|||80.167||
-forecast_data|stem|b138a499bfe39e49|d9c24e1615a75e56|159b086c104b4a96|-1655811718||t20409.6826785127s|s303086b|303086|rds|local|vector|||16.28||
-alloscore_2021.02.06|stem||9d18dbf2640b67a9|36f0ae30f63cfe49|1001568613||t20409.6826993021s||0|rds|local|vector|||1.64||ℹ In index: 1. Caused by error in `seq.default()`: ! 'to' must be a finite number
+score_data|stem|82ec7e2724c42754|8c0836b4ae9e6dfa|d9ad86b948d3a9c7|1357706333||t20412.6728727249s|s173400b|173400|rds|local|vector|||3.744||
+alloscore_2021.02.06|stem||9d18dbf2640b67a9|6ee7a841036c11da|1001568613||t20409.6826993021s||0|rds|local|vector|||402.417||ℹ In index: 1. Caused by error in `map()`: ℹ In index: 1. Caused by error in `bind_cols()`: ! Can't recycle `..1` (size 16708800) to match `y` (size 70800).

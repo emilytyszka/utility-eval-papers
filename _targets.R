@@ -61,27 +61,27 @@ setup <- list(
   tar_target(
     name = exponential_example,
     command = make_exponential_example_figure()
-  ),
-  tar_target(
-    name = Kat15k_alloscores,
-    command = run_and_assemble_alloscores(forecast_data,
-                                          truth_data,
-                                          reference_dates = values$forecast_dates,
-                                          one_K = 15000)
-  ),
-  tar_target(
-    name = pops22,
-    command = readr::read_csv("https://www2.census.gov/programs-surveys/popest/datasets/2020-2022/state/totals/NST-EST2022-ALLDATA.csv") |> 
-      dplyr::select(full_location_name = NAME, POPESTIMATE2021) |>
-      dplyr::inner_join(hub_locations, by = join_by(full_location_name))
-  )
+  # ),
+  # tar_target(
+  #   name = Kat15k_alloscores,
+  #   command = run_and_assemble_alloscores(forecast_data,
+  #                                         truth_data,
+  #                                         reference_dates = values$forecast_dates,
+  #                                         one_K = 15000)
+  # ),
+  # tar_target(
+  #   name = pops22,
+  #   command = readr::read_csv("https://www2.census.gov/programs-surveys/popest/datasets/2020-2022/state/totals/NST-EST2022-ALLDATA.csv") |> 
+  #     dplyr::select(full_location_name = NAME, POPESTIMATE2021) |>
+  #     dplyr::inner_join(hub_locations, by = join_by(full_location_name))
+  # )
 )
 
 ## from Ben's "overk" analysis
 # tar_map(
 #   values=values,
 #   tar_target(alloscore_overk, run_alloscore_overk(forecast_data, truth_data, forecast_dates))
-# )
+ )
 
 mapped <- tar_map(
   unlist = FALSE,
@@ -89,23 +89,24 @@ mapped <- tar_map(
   tar_target(
     alloscore,
     run_alloscore_one_date(forecast_data, truth_data, forecast_dates)
-    )
-)
+    ))
 
 combined <- tar_combine(
   name = all_alloscore_data,
   mapped[["alloscore"]],
   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
 )
+
 # tar_target(
 #   name = figure_K_v_alloscore,
 #   command = plot_K_v_alloscore(alloscore_df),
 #   format = "file"
 # )
 
-make_percap <- tar_target(
-  name = percap,
-  command = score_per_capita_allocation(dat = Kat15k_alloscores, pops = pops22)
-)
+# make_percap <- tar_target(
+#   name = percap,
+#   command = score_per_capita_allocation(dat = Kat15k_alloscores, pops = pops22)
+# )
 
-list(setup, mapped, combined, make_percap)
+list(setup, mapped, combined#, make_percap
+     )
