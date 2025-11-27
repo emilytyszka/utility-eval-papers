@@ -82,7 +82,7 @@ run_alloscore <- function(
 
 ## make a grid of Ks that goes from start to at most maxlength by step
 
-make_K_grid <- function(values, start = 200, stopfactor = 4, maxlength = 60000, step = 200) {
+make_K_grid <- function(values, start = 200, stopfactor = 4, maxlength = 600000, step = 200) {
   if (any(is.na(values))) {
     warning("NA values detected in make_K_grid. These will be removed from summation.")
   }

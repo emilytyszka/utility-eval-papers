@@ -67,7 +67,7 @@ setup <- list(
     command = run_and_assemble_alloscores(forecast_data,
                                           truth_data,
                                           reference_dates = values$forecast_dates,
-                                          one_K = 15000)
+                                          one_K = 150000)
   ),
   tar_target(
     name = pops22,
