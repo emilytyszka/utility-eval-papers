@@ -6,6 +6,9 @@ library(tarchetypes)
 library(tibble)
 library(crew)
 library(covidHubUtils)
+library(readxl)
+library(dplyr)
+library(tidyverse)
 data("hub_locations")
 
 # Set target options:
@@ -71,8 +74,11 @@ setup <- list(
   ),
   tar_target(
     name = pops22,
-    command = readr::read_csv("https://www2.census.gov/programs-surveys/popest/datasets/2020-2022/state/totals/NST-EST2022-ALLDATA.csv") |>
-      dplyr::select(full_location_name = NAME, POPESTIMATE2021) |>
+    command = readxl::read_excel("data/CA_DeptOfFinance_PopEstim_2021-2025.xlsx", sheet = "Table 1 County State", skip = 2) |> 
+      drop_na(`1/1/2021`) |> 
+      mutate(full_location_name = ifelse(County == "State Total", "California", 
+                                         paste(`County`, "County, CA")),
+             POPESTIMATE2021 = `1/1/2021`) |> select(full_location_name, POPESTIMATE2021) |>
       dplyr::inner_join(hub_locations, by = join_by(full_location_name))
   )
 )

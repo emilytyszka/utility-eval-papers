@@ -17,7 +17,6 @@ alloscore_2022.02.21|stem|bca8f1a5a94b8d98|af268e2020a918da|fa7a288aa68e8bbc|489
 alloscore_2022.02.28|stem|09d46883743ae6ae|cfe6577e316004eb|fa7a288aa68e8bbc|-1283256265||t19930.5918515622s|630d8dc80a89e9e5|507276|rds|local|vector|||145.18||
 mapped|object|3f986b822048f52e|||||||||||||||
 setup|object|0352a3d3881c799d|||||||||||||||
-pops22|stem|3553ba3781caec0c|b3ea8f53c98c0695|60634373c0a29a0a|-1385258444||t20412.6667034545s|s1638b|1638|rds|local|vector|||0.706||
 exponential_example|stem|235d9ea2980bb8ee|fb36eb4d3da0d075|a6320d3fff779e45|-1439913131||t20412.666707534s|s78b|78|rds|local|vector|||1.006||
 truth_data|stem|a218fde3bc6f1413|ce02bc7001733eee|496a0573bc1107e6|1269992088||t20412.6667836454s|s30732b|30732|rds|local|vector|||7.668||
 eligible_models|stem|6cb0341277a17ff7|1f6c1681c0871fe7|f8297a3f292e090b|1035057949||t20412.6675834354s|s46b|46|rds|local|vector|||76.699||
@@ -27,6 +26,7 @@ Kat15k_alloscores|stem|8d9366ad6de358ea|4fd7fea5da531d6e|e627e3e6d0faa306|-13754
 alloscore_2021.02.13|stem|9726908818a9a5bf|da3bd3cfab4c64fd|739efdefd8ec213a|314950346||t20423.8488175548s|s1901329b|1901329|rds|local|vector|||499.72||
 alloscore_2021.02.06|stem|24ff96b5bccbd6c4|9d18dbf2640b67a9|739efdefd8ec213a|1001568613||t20423.9002225443s|s19629991b|19629991|rds|local|vector|||1653.979||
 all_alloscore_data|stem|e15d6d4cb71f417e|6ed8eeddb7f9adf0|d85000fe20d06ac0|-1518431668||t20423.9002517248s|s21155192b|21155192|rds|local|vector|||0.175||
+pops22|stem|3548fdf272458da1|57bddcd2bf0dbd1f|60634373c0a29a0a|-1385258444||t20424.6631351932s|s1731b|1731|rds|local|vector|||0.359||
 get_derivative|function|b00754d2f295e19a
 make_K_grid|function|432d70ba406b5ef6
 pdqr_factory|function|42836b9984aac353
@@ -66,7 +66,7 @@ zxh_tab3|object|6e68cb91d6c749c6
 hub_locations|object|0da64b695031bca2
 dexp_under_loss|function|ad78f132daaf81ef
 dexp_over_loss|function|4bf0ee3f7cdc85f0
-score_per_capita_allocation|function|bf5e3b8cf412fd58
+score_per_capita_allocation|function|192ca818c5054c64
 add_pdqr_funs|function|b7ac86eccbe9ef83
 plot_scores_slim|function|df179c43b436b0b6
 post_process|function|dbc3613acec3a159
@@ -94,4 +94,4 @@ oracle_allocate|function|dc56db6d21c48f93
 alloscore.default|function|04427ffb0b027d60
 oracle_alloscore|function|6691e5ebb9f45de7
 alloscore.allocated|function|ea7d5b6e855a9eed
-percap|stem|4935cdbfca7ed58d|21e5f47478cc3b24|bc76a090843a4c6b|-773127636||t19930.5922018618s||3126319|rds|local|vector|||0.026||Can't select columns that don't exist. ✖ Column `abbreviation` doesn't exist.
+percap|stem|a9c169cd813b4db2|21e5f47478cc3b24|237eda56aec2fd72|-773127636||t20424.6641230105s|s1379752b|1379752|rds|local|vector|||1.252||

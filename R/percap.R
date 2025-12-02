@@ -7,9 +7,9 @@ score_per_capita_allocation <- function(dat, pops, Kmax = 60000) {
 	  select(-K) %>%
 	  tidyr::expand_grid(K = make_K_grid(Kmax)) %>%
 	  relocate(K, .after = reference_date) %>%
-	  slice(1, .by = c(reference_date, K ,abbreviation)) %>%
+	  slice(1, .by = c(reference_date, K ,full_location_name)) %>%
 	  mutate(model = "per-capita") %>%
-	  left_join(pops[c('POPESTIMATE2021', 'abbreviation')], by = "abbreviation") %>%
+	  left_join(pops[c('POPESTIMATE2021', 'full_location_name')], by = "full_location_name") %>%
 	  group_by(K, reference_date) %>%
 	  mutate(popprop = POPESTIMATE2021 / sum(POPESTIMATE2021), .before = x)  %>%
 	  mutate(x = K * popprop, components_raw = pmax(y-x,0),
