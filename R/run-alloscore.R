@@ -62,7 +62,7 @@ run_alloscore <- function(
   alloscore(
     K = Ks,
     y = .[["value"]],
-    target_names = "abbreviation",
+    target_names = "full_location_name",
     slim = slim
   )
   ascores <- ascores %>% dplyr::mutate(

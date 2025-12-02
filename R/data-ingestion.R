@@ -13,8 +13,8 @@ get_forecast_data <- function(forecast_dates, models, locations){
     verbose = FALSE,
     as_of = NULL,
     hub = c("US")) |>
-    align_forecasts() #|>
-    #dplyr::filter(relative_horizon == 14)
+    align_forecasts() |>
+    dplyr::filter(horizon == 2) # use "horizon" for JHU data. >1 horizon creates alloscore() merge errors
 }
 
 get_truth_data <- function(){

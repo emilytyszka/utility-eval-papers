@@ -81,7 +81,7 @@ setup <- list(
 # tar_map(
 #   values=values,
 #   tar_target(alloscore_overk, run_alloscore_overk(forecast_data, truth_data, forecast_dates))
- )
+# )
 
 mapped <- tar_map(
   unlist = FALSE,
@@ -97,16 +97,15 @@ combined <- tar_combine(
   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
 )
 
-# tar_target(
-#   name = figure_K_v_alloscore,
-#   command = plot_K_v_alloscore(alloscore_df),
-#   format = "file"
-# )
+ tar_target(
+   name = figure_K_v_alloscore,
+   command = plot_K_v_alloscore(alloscore_df),
+   format = "file" )
 
-# make_percap <- tar_target(
-#   name = percap,
-#   command = score_per_capita_allocation(dat = Kat15k_alloscores, pops = pops22)
-# )
+ make_percap <- tar_target(
+   name = percap,
+   command = score_per_capita_allocation(dat = Kat15k_alloscores, pops = pops22)
+ )
 
-list(setup, mapped, combined#, make_percap
+list(setup, mapped, combined, make_percap
      )
