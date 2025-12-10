@@ -9,8 +9,8 @@ library(tidyverse)
 
 tar_load(forecast_data)
 tar_load(truth_data)
-tar_load(`values`)
-view(forecast_data)
+#tar_load(`values`)
+
 # run_alloscore_one_date troubleshooting
 run_alloscore_one_date <- function(
     forecast_data,
@@ -173,3 +173,30 @@ pops <- read_excel("data/CA_DeptOfFinance_PopEstim_2021-2025.xlsx", sheet = "Tab
                                       paste(`County`, "County, CA")),
          POPESTIMATE2021 = `1/1/2021`) |> select(full_location_name, POPESTIMATE2021) |>
   dplyr::inner_join(hub_locations, by = join_by(full_location_name))
+
+# With multi-day, merge issue is back - do we have duplicate forecasts?
+view(forecast_data)
+library(tidyverse)
+library(alloscore)
+library(distfromq)
+
+forecast_data_processed <- forecast_data |>
+  ## forecast dates are different but reference dates are Mondays
+  #dplyr::filter(reference_date %in% as.Date("2021-01-30")) |>
+  dplyr::select(-type) |>
+  nest(ps = quantile, qs = value) |>
+  relocate(ps, qs) |>
+  mutate(
+    ps = map(ps, deframe),
+    qs = map(qs, deframe)
+  ) |>
+  #dplyr::filter(model == "CEID-Walk") %>%
+  dplyr::mutate(
+    model = ifelse(model == "COVIDhub-4_week_ensemble", "COVIDhub-ensemble", model)
+  ) |>
+  add_pdqr_funs(dist = "distfromq", types = c("p", "q")) |>
+  relocate(dist, F, Q) |>
+  left_join(
+    truth_data |> select(location, target_end_date, value),
+    by = c("location", "target_end_date")) #%>% filter(horizon==4)
+forecast_data_processed_dedup <- forecast_data_processed %>% distinct(model, horizon, location_name, target_end_date, .keep_all = TRUE)

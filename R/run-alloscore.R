@@ -48,7 +48,8 @@ run_alloscore <- function(
     relocate(dist, F, Q) |>
     left_join(
       truth_data |> select(location, target_end_date, value),
-      by = c("location", "target_end_date"))
+      by = c("location", "target_end_date")) %>% 
+    distinct(model, horizon, location_name, target_end_date, .keep_all = TRUE) # adding this because of known duplicate submission in some models
 
   if (nrow(forecast_data_processed) > 0) {
     if (!is.null(one_K)) {

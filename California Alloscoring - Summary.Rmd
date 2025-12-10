@@ -1,0 +1,169 @@
+---
+title: "California Alloscoring - Summary"
+author: "Emily Tyszka"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE}
+
+library(covidHubUtils)
+library(targets)
+library(ggbump)
+library(kableExtra)
+library(tidyverse)
+
+### Score computation
+tar_load("Kat15k_alloscores")
+tar_load("score_data")
+tar_load("truth_data")
+tar_load("forecast_data")
+tar_load("percap")
+```
+
+# Background
+
+## Forecast Scoring
+
+In recent decades, and especially following the onset of the COVID-19 pandemic, infectious disease forecasting has been of increasing interest to public health practitioners, governments, and executive-level decision-makers both within and outside of the healthcare and public health space. When forecasts produce advance estimates of disease burdens and resource use (such as healthcare visits and hospitalizations) that are accurate and actionable, leaders are able to make proactive policy and organizational decisions that lessen morbidity, prevent mortality, address needs related to disease outbreaks, and reduce avoidable resource waste. [Health departments and hospital use examples]
+
+In the development of these forecasts, teams utilize a wide range of inputs and methodologies, and as a result models may vary widely in their forecast accuracy. Furthermore, model performance may be context-specific - models that perform well in one setting or time period may produce inaccurate predictions and decisions in another, due to differences in the qualities of the population of interest, variation in data accuracy/timeliness, differences in disease dynamics, unaccounted-for variables, or other factors. For this reason, the question of what is the "best model" for a time or context requires standardized methods of scoring and assessment. In response to this need, a number of methods of model assessment have been developed, which quantitatively "score" forecasts on their success predicting outcomes.
+
+## Existing scoring methods
+
+Currently, a number of scoring methods exist across the infectious disease forecasting space. All methods evaluate a given forecast against the truth (the final outcome, of which the forecasters had no knowledge at time of prediction) for a given target (count at a date and time horizon) and then aggregate those into a total score for the model as a whole over the period tested. They are detailed briefly below:
+
+-   **Mean Absolute Error (MAE)**: Mean absolute deviation of the prediction from the true value. On the same scale as the prediction. This measure uses point estimates only.
+
+-   **Root Mean Square Error (RMSE)**: Average deviation of the prediction from the true value, calculated by taking the square root of the average squared residuals. On the same scale as the prediction. This measure uses point estimates only.
+
+-   **Logarithmic Score (LS)**:
+
+-   **CRPS**:
+
+-   **WIS**:
+
+    -   **MWIS**:
+
+## Allocation Score
+
+When selecting a forecast or forecasts to make predictions of a given infectious disease outcome, the above methods can serve as quantitative measures of forecast accuracy, allowing for easy comparison between model performances. All of the existing methods described above, however, evaluate the forecasts entirely on whether [how correct]{.underline} a forecast's predictions can be considered to be, which may or may not translate to [well-informed decision-making]{.underline} when the model is applied in practice.
+
+The allocation score, introduced by [Gerding et al. in 2024](https://academic.oup.com/jrsssa/article/188/4/1299/7927906), scores forecasts instead on their success in allocating limited medical resources across multiple locations. For a given forecast date and time horizon, an forecast is evaluated across all locations together.
+
+### Overview:
+
+In its simplest form, this scoring framework:
+
+1.  Identifies a set of limited resources\* of count K, which will be distributed across the locations based on their forecasts.
+
+2.  Compiles a set of disease burden forecasts for multiple locations (ex. all counties in a state) and distributes the limited resources according to the forecast's prediction of disease burden (ie. predicted need) in those locations.
+
+3.  Determines the true need across all locations from the true counts (finalized after the forecasted date has passed)
+
+4.  Generates an ideal "oracle" distribution that would be made by a decision-maker with knowledge of the true need
+
+5.  Calculates unmet need:
+
+    1.  [Total unmet need]{.underline}: Forecasts that distribute fewer units of resource than required in a given location leave unmet need. This is summed across all locations. Where more resources than are needed are allocated, this number is 0.
+    2.  [Total unavoidable unmet need]{.underline}: In cases of resource constraints, it is not possible to distribute resources such that all locations meet their needs. If the oracle distribution requires more units of resource than exist in the distribution problem, the difference is defined as unavoidable unmet need. This is summed across all locations.
+    3.  [Total avoidable unmet need]{.underline} = total unmet need - total unavoidable unmet need
+
+6.  This count of total avoidable unmet need is the [**allocation score (AS)**]{.underline}.
+
+###### *\*Note: the resources in question remain theoretical, but are considered to be available for distribution to the locations of interest. For example, ventilators, PPE, or mobile staffing such as travel nurses may all be "sent" to a location that predicts higher resource need. Hospital beds, while in some ways able to be distributed (as through the setup of field hospitals) are less mobile and perhaps less suited to this particular thought experiment. Regardless, the actual resource does not matter, so long as it may be distributed across locations based on a set of forecasts, its need is expressed by the disease burden forecasts of interest, and it can be "wasted" if incorrectly distributed.*
+
+### AS for Probabilistic Forecasts:
+
+Expanding upon this method for use with probabilistic forecasts, where predictions are expressed in terms of quantiles of a probability distribution, the basic allocation score method is expanded by:
+
+-   Generating a *loss function*, which expresses the sum of contributions from unmet need in each location, for a given allocation.
+
+-   Incorporating the probability distributions of each forecast, find the expected value of the loss function across all locations for the allocation of interest.
+
+-   Selecting the allocation which minimizes the value of the loss function.
+
+### Some additional notes:
+
+Additional considerations for the allocation score:
+
+-   "At its core, the AS measures whether the forecast accurately captures the relative magnitudes of resource need across different locations, which is precisely the information that is needed to allocate resources to those locations subject to a fixed resource constraint." - Gerding et al.
+
+-   The raw numerical values of the allocation score are dependent upon the resource constraint established when selecting K. All else being equal, with a lower selected K we can expect a higher AS, since there are a lower number of resources to distribute relative to observed need.
+
+    -   As a result of this, it should be noted that raw AS values *between* experiments are not comparable. Two compare the raw AS values of two forecasts, they should be subjected to the same experiment.
+
+    -   As an additional extension to the AS, the calculation of **Integrated Allocation Score (IAS)** addresses uncertainty with regards to resource levels. This score is generated by determining AS across a grid of discrete possible K values, weighed by their probabilities. (CHECK HOW THE CODE RAN THIS - WHAT IS MIN AND MAX K? WHAT P(K) DISTRIB USED TO WEIGH?)
+
+# Project Justification and Goals
+
+-   As far as we are aware, no researchers have attempted running the allocation score following the initial paper publication. A major goal of this project is to repeat the scoring methodology on a new set of epidemic data and evaluate its performance and relevance to decisions made during the period of interest
+
+-   California was selected due to:
+
+    -   Being a large population state with 58 counties of varying populations
+
+    -   Robust forecast-related infrastructure and recordkeeping by the California Department of Public Health’s (CDPH) COVID Modeling Team
+
+    -   The frequent usage of COVID-19 forecasts throughout the early pandemic by state level decision-makers.
+
+    -   Existing relationships with the CA COVID Modeling Team, who can consult upon scoring results and their applicability to the decisions that were made during the period of interest
+
+-   This project attempts to replicate the initial national-level + statewide analysis on all 58 counties in California during a high burden period.
+
+    -   In [*Assessing the accuracy of California county level COVID-19 hospitalization forecasts to inform public policy decision making*](https://link.springer.com/article/10.1186/s12889-023-15649-0), White *et* *al.* evaluated forecasts during the Alpha through early Omicron waves. As a result, this project chooses the Delta wave as a time period of interest.
+
+    -   Models of interest will be selected for consistent reporting across all counties + statewide, and coverage of 5+ quantiles during the time period in question. Duplicate models/models from the same teams with methodological overlap will be dropped.
+
+# Experimental Outline
+
+1.  **Select a subset of models that consistently submitted forecasts for weekly incident cases during the Delta wave (summer 2021), with particular interest in forecasts submitted at critical weeks in the epidemic (start of rise, start of descent).** Additional criteria include:
+    1.  Forecasts must submit predictions for all CA counties + statewide.
+    2.  Predictions must include at least 5 quantiles
+    3.  Of particular interest are the 2 week, 3 week, 4 week, and 5 week time horizons ***\<-** CHANGE THESE CHOICES AS NEEDED*
+    4.  As a control, a per capita allocation will be used: *allocation based on county census population*
+2.  **Run the allocation score for the selected forecasts:**
+    1.  Determine an appropriate count of resource (K) for the allocation problem.
+    2.  For each model, week, and horizon, calculate the allocation score across all locations.
+    3.  [Optional] attempt analysis on a second, differing K count (relative scores are not expected to change, but this is useful to understanding.
+3.  **Compare allocation score results to mWIS (and other?) scoring methods:**
+    1.  Visualize score for each model by week for the selected horizons (like plot Nick quickly made)
+        1.  Put next to the same for WIS
+    2.  Visualize relative ranks over time (is there a good non spaghetti way to do this?)
+        1.  And is there any way to compile this? Metrics average ranking, etc.
+    3.  Visualize loss (it's in the manuscript)
+    4.  Select 3 top models: visualize (time series graphs in manuscript)
+4.  **[Further rabbitholes]**
+    1.  Regional evaluation as done in the CDPH paper
+    2.  
+
+# Time Period of Interest
+
+```{r}
+
+truth_data_ca <- truth_data %>% filter(location_name == "California")
+
+ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
+  geom_rect(aes(xmin=as.Date("2021-06-21"), xmax=as.Date("2021-09-01"), ymin=-Inf, ymax=+Inf), 
+                              fill='cyan3', alpha=0.002) + geom_point() + geom_line() + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Statewide Weekly Incident COVID-19 Cases", subtitle = "Delta wave period (June 21—September 1, 2021) is highlighted")  + theme_bw()
+
+
+```
+THIS TIME PERIOD SEEMS SHORT - INCLUDE DOWNSWING?
+THIS MIGHT BE NICE WITH LABELS OF ANY PH DECISIONS MADE/MAJOR EVENTS - SEE PAPER IF ANYTHING POPS UP
+
+# Data Sources and Selection
+
+## COVID-19 Forecast Data
+
+## Model Selection
+
+## California Population Data
+
+## Resources to Allocate
+
+# Results
+
+## 
+
+# Insights

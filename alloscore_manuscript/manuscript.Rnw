@@ -47,6 +47,7 @@ Sciences, University of Massachusetts at Amherst}
 \title{Evaluating infectious disease forecasts \\ with allocation scoring rules}
 
 \begin{document}
+\SweaveOpts{concordance=TRUE}
 
 \newcommand{\del}[2]{\frac{\partial {#1} }{\partial {#2}} }
 \newcommand{\dby}[2]{\frac{d {#1} }{d {#2}} }

@@ -33,7 +33,7 @@ tar_source(files = c("R/data-ingestion.R",
                      "R/percap.R",
                      "R/plot_functions.R"))
 
-values <- tibble(forecast_dates = as.character(seq.Date(as.Date("2021-02-06"), as.Date("2021-02-13"), by = "7 days")))
+values <- tibble(forecast_dates = as.character(seq.Date(as.Date("2021-02-06"), as.Date("2021-03-27"), by = "7 days")))
 
 ## create a group of alloscore targets
 ##values <- tidyr::expand_grid(models = mkeep, forecast_dates = forecast_dates)
@@ -115,3 +115,4 @@ combined <- tar_combine(
 
 list(setup, mapped, combined, make_percap
      )
+
