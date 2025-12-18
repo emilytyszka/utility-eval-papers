@@ -21,6 +21,22 @@ tar_load("forecast_data")
 tar_load("percap")
 ```
 
+Meeting with Nick 12/10
+
+-   Went over data pull, thought process of what time periods to look at.
+
+-   Big experimental idea:
+
+    -   2 tests at the second week of the upswing for each epidemic
+
+    -   Set different K values for purposes of resource allocation - maybe 50k and 400k respectively?
+
+    -   From weeks, select eligible models + run with constraints.
+
+    -   Run
+
+    -   Evaluate. Look at the differences in relative case rates for the different counties - very noisy, some didn't have delta or omicron at all, etc.
+
 # Background
 
 ## Forecast Scoring
@@ -122,7 +138,7 @@ Additional considerations for the allocation score:
     2.  Predictions must include at least 5 quantiles
     3.  Of particular interest are the 2 week, 3 week, 4 week, and 5 week time horizons ***\<-** CHANGE THESE CHOICES AS NEEDED*
     4.  As a control, a per capita allocation will be used: *allocation based on county census population*
-2.  **Run the allocation score for the selected forecasts:**
+2.  **Run the allocation score for the selected forecasts on 2 dates on the upswings of their respective epidemics:**
     1.  Determine an appropriate count of resource (K) for the allocation problem.
     2.  For each model, week, and horizon, calculate the allocation score across all locations.
     3.  [Optional] attempt analysis on a second, differing K count (relative scores are not expected to change, but this is useful to understanding.
@@ -146,8 +162,7 @@ Additional considerations for the allocation score:
 truth_data_ca <- truth_data %>% filter(location_name == "California")
 
 ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
-  geom_rect(aes(xmin=as.Date("2021-06-21"), xmax=as.Date("2021-09-01"), ymin=-Inf, ymax=+Inf), 
-                              fill='cyan3', alpha=0.002) + geom_point() + geom_line() + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Statewide Weekly Incident COVID-19 Cases", subtitle = "Delta wave period (June 21—September 1, 2021) is highlighted")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  geom_point() + geom_line() + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Statewide Weekly Incident COVID-19 Cases", subtitle = "Delta wave period (June 21—September 1, 2021) is highlighted")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +
 
 
 ```
