@@ -21,6 +21,22 @@ tar_load("forecast_data")
 tar_load("percap")
 ```
 
+Meeting with Nick 12/10
+
+-   Went over data pull, thought process of what time periods to look at.
+
+-   Big experimental idea:
+
+    -   2 tests at the second week of the upswing for each epidemic
+
+    -   Set different K values for purposes of resource allocation - maybe 50k and 400k respectively?
+
+    -   From weeks, select eligible models + run with constraints.
+
+    -   Run
+
+    -   Evaluate. Look at the differences in relative case rates for the different counties - very noisy, some didn't have delta or omicron at all, etc.
+
 # Background
 
 ## Forecast Scoring
@@ -117,12 +133,14 @@ Additional considerations for the allocation score:
 
 # Experimental Outline
 
-1.  **Select a subset of models that consistently submitted forecasts for weekly incident cases during the Delta wave (summer 2021), with particular interest in forecasts submitted at critical weeks in the epidemic (start of rise, start of descent).** Additional criteria include:
+1.  **Select a subset of models that submitted forecasts on the weeks of 11/21/2020 and 12/25/2021.** Additional criteria include:
     1.  Forecasts must submit predictions for all CA counties + statewide.
     2.  Predictions must include at least 5 quantiles
-    3.  Of particular interest are the 2 week, 3 week, 4 week, and 5 week time horizons ***\<-** CHANGE THESE CHOICES AS NEEDED*
+    3.  Forecasts must include predictions for the 1 week, 2 week, 3 week, 4 week, and 5 week time horizons
+        1.  11/21/2020: target dates of 2020-11-28, 2020-12-05, 2020-12-12, 2020-12-19, and 2020-12-26
+        2.  12/25/2021: target dates of 2022-01-01, 2022-01-08, 2022-01-15, 2022-01-22, and 2022-01-29
     4.  As a control, a per capita allocation will be used: *allocation based on county census population*
-2.  **Run the allocation score for the selected forecasts:**
+2.  **Run the allocation score for the selected forecasts on the 2 dates:**
     1.  Determine an appropriate count of resource (K) for the allocation problem.
     2.  For each model, week, and horizon, calculate the allocation score across all locations.
     3.  [Optional] attempt analysis on a second, differing K count (relative scores are not expected to change, but this is useful to understanding.
@@ -145,16 +163,31 @@ Additional considerations for the allocation score:
 
 truth_data_ca <- truth_data %>% filter(location_name == "California")
 
+dates_of_interest <- truth_data %>% filter(target_end_date == "2020-11-21" | 
+                                             target_end_date == "2021-12-18") %>% 
+  filter(location_name == "California")
+
+horizons_of_interest <- truth_data %>% filter(target_end_date == "2020-11-28" | 
+                                                target_end_date == "2020-12-05" |
+                                                target_end_date == "2020-12-12" |
+                                                target_end_date == "2020-12-19" |
+                                                target_end_date == "2020-12-26" |
+                                             target_end_date == "2021-12-25"|
+                                             target_end_date == "2022-01-01"|
+                                             target_end_date == "2022-01-08"|
+                                             target_end_date == "2022-01-15"|
+                                             target_end_date == "2022-01-22") %>% 
+  filter(location_name == "California")
+
 ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
-  geom_rect(aes(xmin=as.Date("2021-06-21"), xmax=as.Date("2021-09-01"), ymin=-Inf, ymax=+Inf), 
-                              fill='cyan3', alpha=0.002) + geom_point() + geom_line() + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Statewide Weekly Incident COVID-19 Cases", subtitle = "Delta wave period (June 21—September 1, 2021) is highlighted")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+  geom_point() + geom_line() + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Statewide Weekly Incident COVID-19 Cases", subtitle = "cyan = forecast date; pink = target dates")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + geom_point(data = dates_of_interest, aes(x=target_end_date, y=value), color="cyan2") + geom_point(data = horizons_of_interest, aes(x=target_end_date, y=value), color="magenta")
 
 
 ```
 
-THIS TIME PERIOD SEEMS SHORT - INCLUDE DOWNSWING? THIS MIGHT BE NICE WITH LABELS OF ANY PH DECISIONS MADE/MAJOR EVENTS - SEE PAPER IF ANYTHING POPS UP
+***NOTE***: An attempt to use December 25th, 2021 had issues because of the holiday - many teams reported on different dates, so I will be using
 
-## Top 5 and Bottom 5 Most Populous Counties
+### Note: Time Series for the Top 5 and Bottom 5 Most Populous Counties
 
 ```{r echo=FALSE}
 
@@ -163,21 +196,19 @@ toppops <- truth_data %>% filter(location_name != "California") %>% select(locat
 toppops <- as.vector(toppops$location)
 bottompops <- truth_data %>% filter(location_name != "California") %>% select(location, population) %>%
   distinct(location, .keep_all = TRUE) %>% arrange(population) %>% head(5) %>% select(location)
-botompops <- as.vector(bottompops$location)
+bottompops <- as.vector(bottompops$location)
 
 truth_data_populations_top <- truth_data %>% filter(location %in% toppops)
 ggplot(data=truth_data_populations_top, aes(x=target_end_date, y=value)) + 
   geom_rect(aes(xmin=as.Date("2021-06-21"), xmax=as.Date("2021-09-01"), ymin=-Inf, ymax=+Inf), 
                               fill='cyan3', alpha=0.002) + geom_point() + geom_line() + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Weekly Incident COVID-19 Cases in 5 Most Populous Counties", subtitle = "Delta wave period (June 21—September 1, 2021) is highlighted")  + theme_bw() + facet_wrap(~location_name, nrow = 2, ncol = 5) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
-truth_data_populations_bottom <- truth_data %>% filter(location %in% botompops)
+truth_data_populations_bottom <- truth_data %>% filter(location %in% bottompops)
 ggplot(data=truth_data_populations_bottom, aes(x=target_end_date, y=value)) + 
   geom_rect(aes(xmin=as.Date("2021-06-21"), xmax=as.Date("2021-09-01"), ymin=-Inf, ymax=+Inf), 
                               fill='cyan3', alpha=0.002) + geom_point() + geom_line() + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Weekly Incident COVID-19 Cases in 5 Least Populous Counties", subtitle = "Delta wave period (June 21—September 1, 2021) is highlighted")  + theme_bw() + facet_wrap(~location_name, nrow = 2, ncol = 5) + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
 
 ```
-
-**GGPLOT REFUSING TO PUT FACTORS IN ORDER - ANNOYING**
 
 # Data Sources and Selection
 
@@ -185,21 +216,27 @@ ggplot(data=truth_data_populations_bottom, aes(x=target_end_date, y=value)) +
 
 ## Model Selection
 
-```{r}
+For this section, we will select the models to run by finding those that reported for all counties + CA on a given forecast date. California has 58 counties, so including a statewide estimate, we expect to have 59 predictions for a given forecast date, time horizon, and quantile.
+
+We will therefore visualize, by forecast date + quantile, how many predictions each model submitted for each horizon.
+
+```{r include=FALSE, echo=FALSE}
 
 # locations - CA state + CA county
 data("hub_locations")
 locations <- hub_locations |>
   dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA")) | geo_type == "state" & (abbreviation %in% c("CA"))) |>
   dplyr::pull(fips)
-values <- c(forecast_dates = as.character(seq.Date(as.Date("2021-06-21"), as.Date("2021-09-01"), by = "1 week")))
+values <- c(forecast_dates = c(as.Date("2020-11-21"), as.Date("2021-12-16"), as.Date("2021-12-17"),
+                               as.Date("2021-12-18"), as.Date("2021-12-19"), as.Date("2021-12-20"), 
+                               as.Date("2021-12-21")))
 allforecasts <- load_forecasts(
     dates = values,
     date_window_size = 6,
     #models = "COVIDhub-ensemble",
     locations = locations,
     types = c("quantile"),
-    targets = paste(1:6, "wk ahead inc case"),
+    targets = paste(1:7, "wk ahead inc case"),
     source = "zoltar",
     verbose = FALSE,
     as_of = NULL,
@@ -213,33 +250,161 @@ allforecasts <- load_forecasts(
 ## For a given model, quantile, and horizon (in weeks), what is the date-by-date count of predictions? 
 ##California has 58 counties, so counties + statewide would be 59 predictions - that would be an ideal number to shoot for.
 
-pointestimatecompleteness <- as.data.frame(table(allforecasts$model, allforecasts$target_end_date, allforecasts$horizon, allforecasts$quantile))
+pointestimatecompleteness <- as.data.frame(table(allforecasts$model, allforecasts$forecast_date, allforecasts$horizon, allforecasts$quantile))
 pointestimatecompleteness <- rename(as_tibble(pointestimatecompleteness), Model = Var1, Date = Var2, "Horizon (Weeks)" = Var3, Quantile = Var4)
 
-# pointestimatecompletenesswide <- pointestimatecompleteness %>%  pivot_wider(
-#     id_cols = c("Model", "Horizon (Weeks)", "Quantile"),
-#     names_from = Date,
-#     values_from = Freq
-#   )
-# rename(pointestimatecompletenesswide, Model = Var1, "Horizon (Weeks)" = Var3, Quantile = Var4)
+pointestimatecompleteness$Freq <- as.numeric(pointestimatecompleteness$Freq)
+pointestimatecompleteness <- pointestimatecompleteness %>% dplyr::mutate(FreqDiscrete = case_when(
+  Freq==0 ~ "No Prediction",
+  Freq==1 ~ "1 Prediction",
+  Freq>1 & Freq< 59 ~ "Between 1 and 58 Predictions",
+  Freq==59  ~ "Exactly 59 Predictions",
+  Freq> 59 & Freq < 100 ~ "59-99 Predictions",
+  Freq > 99 & Freq <  200 ~ "100-200 Predictions",
+  Freq > 200 ~ "Over 200 Predictions",
+  TRUE ~ NA
+))
+pointestimatecompleteness$FreqDiscrete <- factor(pointestimatecompleteness$FreqDiscrete, 
+                                                 levels = c("No Prediction", "1 Prediction",
+                                                            "Between 1 and 58 Predictions", 
+                                                            "Exactly 59 Predictions", 
+                                                            "59-99 Predictions", 
+                                                            "100-200 Predictions",
+                                                            "Over 200 Predictions"))
+
 
 pointestimatecompleteness$Date <- as.Date(pointestimatecompleteness$Date)
 library(viridis)
-countovertime_1wk_2.5 <- pointestimatecompleteness %>% filter(`Horizon (Weeks)` == 1 & Quantile == 0.025) %>% ggplot(aes(y=Model, x=Date, fill=Freq))+
+
+```
+
+### November 21st, 2020 {.tabset}
+
+The 50% and 2.5% quantiles show the same number of reports in total for each For the November 21st, 2020 date, we see forecasts reported for the following:
+
+-   UVA-Ensemble
+
+-   JHUAPL-Bucky
+
+-   COVIDhub-ensemble
+
+-   COVIDhub-baseline
+
+-   COVIDhub-4_week_ensemble
+
+-   COVIDhub_CDC-ensemble
+
+-   CEID-Walk
+
+***However***, we can see here that there are multiple COVID Hub ensembles being reported. We will select the 4 week ensemble, resulting in the following 4 models to examine for this forecast date:
+
+-   **UVA-Ensemble**
+
+-   **JHUAPL-Bucky**
+
+-   **COVIDhub-4_week_ensemble**
+
+-   **CEID-Walk**
+
+#### 50%
+
+```{r echo=FALSE}
+countovertime_Nov21_50 <- pointestimatecompleteness %>% filter(Quantile == 0.5, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
   geom_tile(color= "white") + 
-  scale_fill_viridis(name="Count of Predictions", direction=-1) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) + 
-  scale_x_date(date_breaks = "2 week", date_labels = "%Y-%W") + 
-  ggtitle("Weekly Count of Submissions by Model (Counties + CA = 59)", subtitle = "Horizon = 1 week, Quantile = 0.025")
-countovertime_1wk_2.5
+  scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
+  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.500")
+countovertime_Nov21_50
+```
+
+#### 25%
+
+```{r echo=FALSE}
+countovertime_Nov21_25 <- pointestimatecompleteness %>% filter(Quantile == 0.25, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+  geom_tile(color= "white") + 
+  scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
+  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.250")
+countovertime_Nov21_25
+```
+
+#### 10%
+
+```{r echo=FALSE}
+countovertime_Nov21_10 <- pointestimatecompleteness %>% filter(Quantile == 0.10, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+  geom_tile(color= "white") + 
+  scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
+  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.100")
+countovertime_Nov21_10
+```
+
+#### 2.5%
+
+```{r echo=FALSE}
+countovertime_Nov21_2.5 <- pointestimatecompleteness %>% filter(Quantile == 0.025, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+  geom_tile(color= "white") + 
+  scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
+  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.025")
+countovertime_Nov21_2.5
+```
+
+### December 18th, 2021 {.tabset}
+
+***WHICH DAY IS THE DAY? THIS IS EXTREMELY INCONSISTENT DUE POSSIBLY TO THE HOLIDAY!***
+
+```{r echo=FALSE}
+
+countovertime_Dec18_50 <- pointestimatecompleteness %>% filter(Quantile == 0.5, Date == "2021-12-21") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+  geom_tile(color= "white") + 
+  scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
+  ggtitle("2021-12-18: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.500")
+countovertime_Dec18_50
+
+countovertime_Dec18_25 <- pointestimatecompleteness %>% filter(Quantile == 0.25, Date == "2021-12-18") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+  geom_tile(color= "white") + 
+  scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
+  ggtitle("2021-12-18: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.250")
+countovertime_Dec18_25
+
+countovertime_Dec18_10 <- pointestimatecompleteness %>% filter(Quantile == 0.10, Date == "2021-12-18") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+  geom_tile(color= "white") + 
+  scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
+  ggtitle("2021-12-18: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.100")
+countovertime_Dec18_10
+
+countovertime_Dec18_2.5 <- pointestimatecompleteness %>% filter(Quantile == 0.025, Date == "2021-12-18") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+  geom_tile(color= "white") + 
+  scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
+  ggtitle("2021-12-18: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.025")
+countovertime_Dec18_2.5
 ```
 
 ## California Population Data
 
 ## Resources to Allocate
 
+Initial decision was to set the resource restraint for Nov 21st 2020 at 50,000, but this seemed quite low (at least visually). Resource was set to 
+
+```{r warning=FALSE}
+ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
+  geom_point() + geom_line() + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Statewide Weekly Incident COVID-19 Cases", subtitle = "Horizonal lines show resource constraints")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +  
+  geom_segment(aes(x = as.Date("2021-10-15"), y = 400000, xend = as.Date("2022-04-15"), yend = 400000), size=1, colour = "red2") + 
+  geom_label(aes(label= "400,0000", y=400000, x=as.Date("2021-08-15")), size=3) +
+  geom_segment(aes(x = as.Date("2020-09-15"), y = 100000, xend = as.Date("2021-04-15"), yend = 100000), size=1, colour = "red2") + 
+  geom_label(aes(label= "100,0000", y=100000, x=as.Date("2020-07-15")), size=3)
+```
+
 # Results
 
-## 
+For each date, the selected models were run for weeks 1-4. Allocation scores were determined.
+
+## November 21st, 2021
+
 
 # Insights
