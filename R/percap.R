@@ -1,7 +1,7 @@
 
-score_per_capita_allocation <- function(dat, pops, Kmax = 60000) {
+score_per_capita_allocation <- function(dat, pops, Kmax = 150000) {
   require(tidyverse)
-
+  dat <- tar_load(dat)
 	percap <- dat %>%
 	  filter(model == "COVIDhub-baseline") %>%
 	  select(-K) %>%

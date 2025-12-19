@@ -15,10 +15,14 @@ library(tidyverse)
 
 ### Score computation
 tar_load("Kat15k_alloscores")
-tar_load("score_data")
+tar_load("score_data1")
+tar_load("score_data2")
+tar_load("score_data3")
+tar_load("score_data4")
 tar_load("truth_data")
 tar_load("forecast_data")
 tar_load("percap")
+
 ```
 
 Meeting with Nick 12/10
