@@ -1,6 +1,6 @@
 models_to_include <- c("CEID-Walk", "COVIDhub-4_week_ensemble", "COVIDhub-baseline", "CU-select", "FAIR-NRAR",  "IowaStateLW-STEM", "JHU_IDD-CovidSP", "JHUAPL-Bucky", "LANL-GrowthRate", "LNQ-ens1", "OneQuietNight-ML", "UChicagoCHATTOPADHYAY-UnIT")  
 
-get_forecast_data <- function(forecast_dates, models, locations){
+get_forecast_data <- function(forecast_dates, models, locations, timehorizon){
   require(covidHubUtils)
   load_forecasts(
     dates = forecast_dates,
@@ -8,13 +8,13 @@ get_forecast_data <- function(forecast_dates, models, locations){
     models = models_to_include,
     locations = locations,
     types = c("quantile"),
-    targets = paste(1:6, "wk ahead inc case"),
+    targets = paste(1:4, "wk ahead inc case"),
     source = "zoltar",
     verbose = FALSE,
     as_of = NULL,
     hub = c("US")) |>
     align_forecasts() |>
-    dplyr::filter(horizon == 2) # use "horizon" for JHU data. >1 horizon creates alloscore() merge errors
+    dplyr::filter(horizon == timehorizon) # use "horizon" for JHU data. >1 horizon creates alloscore() merge errors
 }
 
 get_truth_data <- function(){

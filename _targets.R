@@ -25,7 +25,10 @@ tar_option_set(
 # remotes::install_github("reichlab/covidHubUtils")
 
 # Run the R scripts in the R/ folder:
-tar_source(files = c("R/data-ingestion.R",
+tar_source(files = c("R/data-ingestion1.R",
+                     "R/data-ingestion2.R",
+                     "R/data-ingestion3.R",
+                     "R/data-ingestion4.R",
                      "R/plot-alloscores.R",
                      "R/run-alloscore.R",
                      "R/determine-model-eligibility.R",
@@ -50,8 +53,20 @@ setup <- list(
     command = determine_eligible_models(values$forecast_dates, locations = reqd_locs)
   ),
   tar_target(
-    name = forecast_data,
-    command = get_forecast_data(values$forecast_dates, models = eligible_models, locations = reqd_locs)
+    name = forecast_data1,
+    command = get_forecast_data(values$forecast_dates, models = eligible_models, locations = reqd_locs, timehorizon=1)
+  ),
+  tar_target(
+    name = forecast_data2,
+    command = get_forecast_data(values$forecast_dates, models = eligible_models, locations = reqd_locs, timehorizon=2)
+  ),
+  tar_target(
+    name = forecast_data3,
+    command = get_forecast_data(values$forecast_dates, models = eligible_models, locations = reqd_locs, timehorizon=3)
+  ),
+  tar_target(
+    name = forecast_data4,
+    command = get_forecast_data(values$forecast_dates, models = eligible_models, locations = reqd_locs, timehorizon=4)
   ),
   tar_target(
     name = truth_data,
