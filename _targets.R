@@ -94,32 +94,32 @@ setup <- list(
    command = make_exponential_example_figure()
  ),
  tar_target(
-   name = Kat150k_alloscores1,
+   name = Kat15k_alloscores1,
    command = print(run_and_assemble_alloscores(forecast_data1,
                                          truth_data,
                                          reference_dates = values$forecast_dates[1:9], #it's erroring on 10th date - not sure why
-                                         one_K = 150000))
+                                         one_K = 100000))
  ),
  tar_target(
-   name = Kat150k_alloscores2,
+   name = Kat15k_alloscores2,
    command = print(run_and_assemble_alloscores(forecast_data2,
                                          truth_data,
                                          reference_dates = values$forecast_dates[1:9],
-                                         one_K = 150000))
+                                         one_K = 100000))
  ),
    tar_target(
-     name = Kat150k_alloscores3,
+     name = Kat15k_alloscores3,
      command = print(run_and_assemble_alloscores(forecast_data3,
                                            truth_data,
                                            reference_dates = values$forecast_dates[1:9],
-                                           one_K = 150000))
+                                           one_K = 100000))
    ),
      tar_target(
-       name = Kat150k_alloscores4,
+       name = Kat15k_alloscores4,
        command = print(run_and_assemble_alloscores(forecast_data4,
                                              truth_data,
                                              reference_dates = values$forecast_dates[1:9],
-                                             one_K = 150000))
+                                             one_K = 100000))
      ),
  tar_target(
    name = pops22,
@@ -180,19 +180,19 @@ mapped <- tar_map(
 
  make_percap1 <- tar_target(
    name = percap1,
-   command = score_per_capita_allocation(dat = Kat150k_alloscores1, pops = pops22)
+   command = score_per_capita_allocation(dat = Kat15k_alloscores1, pops = pops22)
  )
  make_percap2 <- tar_target(
    name = percap2,
-   command = score_per_capita_allocation(dat = Kat150k_alloscores2, pops = pops22)
+   command = score_per_capita_allocation(dat = Kat15k_alloscores2, pops = pops22)
  )
  make_percap3 <- tar_target(
    name = percap3,
-   command = score_per_capita_allocation(dat = Kat150k_alloscores3, pops = pops22)
+   command = score_per_capita_allocation(dat = Kat15k_alloscores3, pops = pops22)
  )
  make_percap4 <- tar_target(
    name = percap4,
-   command = score_per_capita_allocation(dat = Kat150k_alloscores4, pops = pops22)
+   command = score_per_capita_allocation(dat = Kat15k_alloscores4, pops = pops22)
  )
 
 #list(setup, mapped, combined, make_percap1, make_percap2, make_percap3, make_percap4)

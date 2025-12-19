@@ -103,7 +103,7 @@ over_loss|function|42d31854af58d1c7
 under_loss|function|ed2a69aec7f47175
 exp_gpl_loss_fun|function|b822eb74af655b6b
 add_pdqr_funs|function|b7ac86eccbe9ef83
-score_per_capita_allocation|function|192ca818c5054c64
+score_per_capita_allocation|function|2b42d44d3d452cc0
 plot_components.allocated|function|81e63a77fdc03a82
 plot_components.default|function|b1df7b6c68d9a783
 post_process|function|dbc3613acec3a159
@@ -125,4 +125,4 @@ oracle_allocate|function|dc56db6d21c48f93
 alloscore.default|function|04427ffb0b027d60
 alloscore.allocated|function|ea7d5b6e855a9eed
 oracle_alloscore|function|6691e5ebb9f45de7
-percap4|stem||35b68eb49ea4cc4e|209ceb4e79a94cea|-239914449||t20441.6529465186s||0|rds|local|vector|||0.354|package ‘ggplot2’ was built under R version 4.5.2|object 'Kat150k_alloscores4' not found
+percap4|stem||a745c1773a74fc34|97e9896a2fdbe58c|-239914449||t20441.6529465186s||0|rds|local|vector|||0.357|package ‘ggplot2’ was built under R version 4.5.2|object 'Kat15k_alloscores4' not found
