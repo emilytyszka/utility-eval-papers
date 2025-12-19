@@ -164,7 +164,7 @@ Additional considerations for the allocation score:
 truth_data_ca <- truth_data %>% filter(location_name == "California")
 
 dates_of_interest <- truth_data %>% filter(target_end_date == "2020-11-21" | 
-                                             target_end_date == "2021-12-18") %>% 
+                                             target_end_date == "2021-12-25") %>% 
   filter(location_name == "California")
 
 horizons_of_interest <- truth_data %>% filter(target_end_date == "2020-11-28" | 
@@ -227,16 +227,15 @@ data("hub_locations")
 locations <- hub_locations |>
   dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA")) | geo_type == "state" & (abbreviation %in% c("CA"))) |>
   dplyr::pull(fips)
-values <- c(forecast_dates = c(as.Date("2020-11-21"), as.Date("2021-12-16"), as.Date("2021-12-17"),
-                               as.Date("2021-12-18"), as.Date("2021-12-19"), as.Date("2021-12-20"), 
-                               as.Date("2021-12-21")))
+
+values <- c(forecast_dates = as.character(seq.Date(as.Date("2020-10-03"), as.Date("2022-03-05"), by = "7 days")))
 allforecasts <- load_forecasts(
     dates = values,
     date_window_size = 6,
     #models = "COVIDhub-ensemble",
     locations = locations,
     types = c("quantile"),
-    targets = paste(1:7, "wk ahead inc case"),
+    targets = paste(1:5, "wk ahead inc case"),
     source = "zoltar",
     verbose = FALSE,
     as_of = NULL,
@@ -250,7 +249,7 @@ allforecasts <- load_forecasts(
 ## For a given model, quantile, and horizon (in weeks), what is the date-by-date count of predictions? 
 ##California has 58 counties, so counties + statewide would be 59 predictions - that would be an ideal number to shoot for.
 
-pointestimatecompleteness <- as.data.frame(table(allforecasts$model, allforecasts$forecast_date, allforecasts$horizon, allforecasts$quantile))
+pointestimatecompleteness <- as.data.frame(table(allforecasts$model, allforecasts$target_end_date, allforecasts$horizon, allforecasts$quantile))
 pointestimatecompleteness <- rename(as_tibble(pointestimatecompleteness), Model = Var1, Date = Var2, "Horizon (Weeks)" = Var3, Quantile = Var4)
 
 pointestimatecompleteness$Freq <- as.numeric(pointestimatecompleteness$Freq)
@@ -280,11 +279,27 @@ library(viridis)
 
 ### November 21st, 2020 {.tabset}
 
-The 50% and 2.5% quantiles show the same number of reports in total for each For the November 21st, 2020 date, we see forecasts reported for the following:
+There is some variation in the completeness of the reports between the quantiles and we don't see many reporting past 4 weeks, but the following forecasts have the best completeness in the state of CA:
 
--   UVA-Ensemble
+-   LNQ-ens1
+
+-   LANL-GrowthRate
 
 -   JHUAPL-Bucky
+
+-   JHU_IDD-CovidSP
+
+-   IowaStateLW-STEM
+
+-   CU-select
+
+-   CU-scenario_mid
+
+-   CU-scenario_low
+
+-   CU-scenario_high
+
+-   CU-nochange
 
 -   COVIDhub-ensemble
 
@@ -292,104 +307,165 @@ The 50% and 2.5% quantiles show the same number of reports in total for each For
 
 -   COVIDhub-4_week_ensemble
 
--   COVIDhub_CDC-ensemble
+-   COVIDhub_CDC_ensemble
 
 -   CEID-Walk
 
-***However***, we can see here that there are multiple COVID Hub ensembles being reported. We will select the 4 week ensemble, resulting in the following 4 models to examine for this forecast date:
+***However***, we can see here that there are multiple CU and COVID Hub ensembles being reported. We will select the 4 week ensemble and CU-Select, resulting in the following 8 models to examine for this forecast date:
 
--   **UVA-Ensemble**
+-   LNQ-ens1
 
--   **JHUAPL-Bucky**
+-   LANL-GrowthRate
 
--   **COVIDhub-4_week_ensemble**
+-   JHUAPL-Bucky
 
--   **CEID-Walk**
+-   JHU_IDD-CovidSP
+
+-   IowaStateLW-STEM
+
+-   CU-select
+
+-   COVIDhub-4_week_ensemble
+
+-   CEID-Walk
+
+*Note:* there are some week horizons where these models might not all appear, due to inconsistencies, but in general we'll focus on these for 11/21/2020.
 
 #### 50%
 
 ```{r echo=FALSE}
-countovertime_Nov21_50 <- pointestimatecompleteness %>% filter(Quantile == 0.5, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+countovertime_Nov21_50 <- pointestimatecompleteness %>% filter(Quantile == 0.5, Date == "2020-11-21") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
   geom_tile(color= "white") + 
   scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
   theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.500")
+  ggtitle("2020-11-21: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.500")
 countovertime_Nov21_50
 ```
 
 #### 25%
 
 ```{r echo=FALSE}
-countovertime_Nov21_25 <- pointestimatecompleteness %>% filter(Quantile == 0.25, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+countovertime_Nov21_25 <- pointestimatecompleteness %>% filter(Quantile == 0.25, Date == "2020-11-21") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
   geom_tile(color= "white") + 
   scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
   theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.250")
+  ggtitle("2020-11-21: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.250")
 countovertime_Nov21_25
 ```
 
 #### 10%
 
 ```{r echo=FALSE}
-countovertime_Nov21_10 <- pointestimatecompleteness %>% filter(Quantile == 0.10, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+countovertime_Nov21_10 <- pointestimatecompleteness %>% filter(Quantile == 0.10, Date == "2020-11-21") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
   geom_tile(color= "white") + 
   scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
   theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.100")
+  ggtitle("2020-11-21: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.100")
 countovertime_Nov21_10
 ```
 
 #### 2.5%
 
 ```{r echo=FALSE}
-countovertime_Nov21_2.5 <- pointestimatecompleteness %>% filter(Quantile == 0.025, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+countovertime_Nov21_2.5 <- pointestimatecompleteness %>% filter(Quantile == 0.025, Date == "2020-11-21") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
   geom_tile(color= "white") + 
   scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
   theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.025")
+  ggtitle("2020-11-21: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.025")
 countovertime_Nov21_2.5
 ```
 
-### December 18th, 2021 {.tabset}
+### December 25th, 2021 {.tabset}
 
-***WHICH DAY IS THE DAY? THIS IS EXTREMELY INCONSISTENT DUE POSSIBLY TO THE HOLIDAY!***
+There is some variation in the completeness of the reports between the quantiles and we don't see many reporting past 4 weeks, but the following forecasts have the best completeness in the state of CA:
+
+-   UVA-Ensemble
+
+-   JHUAPL-Bucky
+
+-   UChicagoCHATTOPADHYAY-UnIT (weeks 1 and 2)
+
+-   CU-select
+
+-   CU-scenario_mid
+
+-   CU-scenario_low
+
+-   CU-nochange
+
+-   COVIDhub-baseline
+
+-   COVIDhub-4_week_ensemble
+
+Filtering this again to get rid of repeat COVIDhib and CU models:
+
+-   UVA-Ensemble
+
+-   JHUAPL-Bucky
+
+-   UChicagoCHATTOPADHYAY-UnIT (weeks 1 and 2)
+
+-   CU-select
+
+-   CU-scenario_mid
+
+-   CU-scenario_low
+
+-   CU-nochange
+
+-   COVIDhub-baseline
+
+-   COVIDhub-4_week_ensemble
+
+#### 50%
 
 ```{r echo=FALSE}
-
-countovertime_Dec18_50 <- pointestimatecompleteness %>% filter(Quantile == 0.5, Date == "2021-12-21") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+countovertime_Dec25_50 <- pointestimatecompleteness %>% filter(Quantile == 0.5, Date == "2021-12-25") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
   geom_tile(color= "white") + 
   scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
   theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2021-12-18: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.500")
-countovertime_Dec18_50
+  ggtitle("2021-12-25: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.500")
+countovertime_Dec25_50
+```
 
-countovertime_Dec18_25 <- pointestimatecompleteness %>% filter(Quantile == 0.25, Date == "2021-12-18") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+#### 25%
+
+```{r echo=FALSE}
+countovertime_Dec25_25 <- pointestimatecompleteness %>% filter(Quantile == 0.25, Date == "2021-12-25") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
   geom_tile(color= "white") + 
   scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
   theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2021-12-18: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.250")
-countovertime_Dec18_25
+  ggtitle("2021-12-25: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.250")
+countovertime_Dec25_25
+```
 
-countovertime_Dec18_10 <- pointestimatecompleteness %>% filter(Quantile == 0.10, Date == "2021-12-18") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+#### 10%
+
+```{r echo=FALSE}
+countovertime_Dec25_10 <- pointestimatecompleteness %>% filter(Quantile == 0.10, Date == "2021-12-25") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
   geom_tile(color= "white") + 
   scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
   theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2021-12-18: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.100")
-countovertime_Dec18_10
+  ggtitle("2021-12-25: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.100")
+countovertime_Dec25_10
+```
 
-countovertime_Dec18_2.5 <- pointestimatecompleteness %>% filter(Quantile == 0.025, Date == "2021-12-18") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
+#### 2.5%
+
+```{r echo=FALSE}
+countovertime_Dec25_2.5 <- pointestimatecompleteness %>% filter(Quantile == 0.025, Date == "2021-12-25") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
   geom_tile(color= "white") + 
   scale_fill_viridis(name="Count of Predictions (Counties + CA = 59)", direction=-1, discrete=TRUE) + 
   theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2021-12-18: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.025")
-countovertime_Dec18_2.5
+  ggtitle("2021-12-25: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.025")
+countovertime_Dec25_2.5
 ```
 
 ## California Population Data
 
 ## Resources to Allocate
 
-Initial decision was to set the resource restraint for Nov 21st 2020 at 50,000, but this seemed quite low (at least visually). Resource was set to 
+Initial decision was to set the resource restraint for Nov 21st 2020 at 50,000, but this seemed quite low (at least visually). Resource was set to
 
 ```{r warning=FALSE}
 ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
@@ -406,5 +482,35 @@ For each date, the selected models were run for weeks 1-4. Allocation scores wer
 
 ## November 21st, 2021
 
+### 1 Week
+
+```{r}
+# tar_load(alloscore_2020.11.16)
+# slim_alloscore_2020.11.16 <- alloscore::slim(alloscore_2020.11.16, id_cols = c("model", "reference_date")) %>%
+#   bind_rows(percap %>% filter(reference_date == "2021-12-06"))
+# 
+# ## for visual context
+# ## curve(dnorm(x, mean=15000, sd=3000), from=0, to=30000)
+# ks <- seq(5000, 250000, by=2000)
+# kprobs <- data.frame(K = ks,
+#                      weight = dnorm(ks, mean=100000, sd=30000)/sum(dnorm(ks, mean=100000, sd=30000)))
+# 
+# 
+# ias <- slim_alloscore_2020.11.16 |>
+#   group_by(model, K) |>
+#   summarize(`Allocation score` = sum(components)) |>
+#   left_join(kprobs) |>
+#   group_by(model) |>
+#   summarize(IAS_wt = sum(`Allocation score`*weight, na.rm=TRUE),
+#             IAS = mean(`Allocation score`)) |>
+#   arrange(IAS)
+# 
+# as <- slim_alloscore_2020.11.21 |>
+#   filter(K == 100000) |>
+#   group_by(model) |>
+#   summarize(AS = sum(components)) |>
+#   arrange(AS)
+# as
+```
 
 # Insights
