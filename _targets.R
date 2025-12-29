@@ -170,9 +170,24 @@ mapped4 <- tar_map(
     run_alloscore_one_date(forecast_data4, truth_data, forecast_dates)
   ))
 
-combined <- tar_combine(
-  name = all_alloscore_data,
-  mapped[["alloscore"]],
+combined1 <- tar_combine(
+  name = all_alloscore_data1,
+  mapped1[["alloscore"]],
+  command = assemble_alloscores(dplyr::bind_rows(!!!.x))
+)
+combined2 <- tar_combine(
+  name = all_alloscore_data2,
+  mapped2[["alloscore"]],
+  command = assemble_alloscores(dplyr::bind_rows(!!!.x))
+)
+combined3 <- tar_combine(
+  name = all_alloscore_data3,
+  mapped3[["alloscore"]],
+  command = assemble_alloscores(dplyr::bind_rows(!!!.x))
+)
+combined4 <- tar_combine(
+  name = all_alloscore_data4,
+  mapped4[["alloscore"]],
   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
 )
 
@@ -198,7 +213,7 @@ combined <- tar_combine(
    command = score_per_capita_allocation(dat = Kat15k_alloscores4, pops = pops22)
  )
 
-list(setup, mapped1, mapped2, mapped3, mapped4, combined, make_percap1, make_percap2, make_percap3, make_percap4)
+list(setup, mapped1, mapped2, mapped3, mapped4, combined1, combined2, combined3, combined4, make_percap1, make_percap2, make_percap3, make_percap4)
 
 
 
