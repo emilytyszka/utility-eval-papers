@@ -8,12 +8,15 @@ library(crew)
 library(covidHubUtils)
 library(readxl)
 library(dplyr)
+library(conflicted)
 library(tidyverse)
 data("hub_locations")
+conflicts_prefer(stats::filter)
+conflicts_prefer(stats::lag)
 
 # Set target options:
 tar_option_set(
-  controller = crew_controller_local(workers = 4),
+  controller = crew_controller_local(workers = 2),
   packages = c("tidyverse", "covidHubUtils", "distfromq", "alloscore", "gh"), # packages that your targets need to run
   imports = c("alloscore"),
   format = "rds" # default storage format
@@ -68,7 +71,7 @@ setup <- list(
   tar_target(
     name = forecast_data4,
     command = get_forecast_data(values$forecast_dates, models = eligible_models, locations = reqd_locs, timehorizon=timehorizon4)
-    ),
+     ),
    tar_target(
      name = truth_data,
      command = get_truth_data()
@@ -88,7 +91,7 @@ setup <- list(
   tar_target(
     name = score_data4,
     command = get_forecast_scores(forecast_data4, truth_data)
-    ),
+    ) ,
  tar_target(
    name = exponential_example,
    command = make_exponential_example_figure()
@@ -120,7 +123,7 @@ setup <- list(
                                              truth_data,
                                              reference_dates = values$forecast_dates[1:9],
                                              one_K = 100000))
-     ),
+     ) ,
  tar_target(
    name = pops22,
    command = readxl::read_excel("data/CA_DeptOfFinance_PopEstim_2021-2025.xlsx", sheet = "Table 1 County State", skip = 2) |>
@@ -145,21 +148,21 @@ mapped1 <- tar_map(
     alloscore,
     run_alloscore_one_date(forecast_data1, truth_data, forecast_dates)
     ))
-mapped <- tar_map(
+mapped2 <- tar_map(
   unlist = FALSE,
   values = values,
   tar_target(
     alloscore,
     run_alloscore_one_date(forecast_data2, truth_data, forecast_dates)
   ))
-mapped <- tar_map(
+mapped3 <- tar_map(
   unlist = FALSE,
   values = values,
   tar_target(
     alloscore,
     run_alloscore_one_date(forecast_data3, truth_data, forecast_dates)
   ))
-mapped <- tar_map(
+mapped4 <- tar_map(
   unlist = FALSE,
   values = values,
   tar_target(
@@ -167,16 +170,16 @@ mapped <- tar_map(
     run_alloscore_one_date(forecast_data4, truth_data, forecast_dates)
   ))
 
-# combined <- tar_combine(
-#   name = all_alloscore_data,
-#   mapped[["alloscore"]],
-#   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
-# )
+combined <- tar_combine(
+  name = all_alloscore_data,
+  mapped[["alloscore"]],
+  command = assemble_alloscores(dplyr::bind_rows(!!!.x))
+)
 
- tar_target(
-   name = figure_K_v_alloscore,
-   command = plot_K_v_alloscore(alloscore_df),
-   format = "file" )
+ # tar_target(
+ #   name = figure_K_v_alloscore,
+ #   command = plot_K_v_alloscore(alloscore_df),
+ #   format = "file" )
 
  make_percap1 <- tar_target(
    name = percap1,
@@ -195,7 +198,7 @@ mapped <- tar_map(
    command = score_per_capita_allocation(dat = Kat15k_alloscores4, pops = pops22)
  )
 
-#list(setup, mapped, combined, make_percap1, make_percap2, make_percap3, make_percap4)
+list(setup, mapped1, mapped2, mapped3, mapped4, combined, make_percap1, make_percap2, make_percap3, make_percap4)
 
 
 
