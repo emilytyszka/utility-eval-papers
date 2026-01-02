@@ -14,32 +14,13 @@ library(kableExtra)
 library(tidyverse)
 
 ### Score computation
-tar_load("Kat15k_alloscores")
-tar_load("score_data1")
-tar_load("score_data2")
-tar_load("score_data3")
-tar_load("score_data4")
 tar_load("truth_data")
-tar_load("forecast_data")
-tar_load("percap")
-
+tar_load("forecast_data1")
+tar_load("forecast_data2")
+tar_load("forecast_data3")
+tar_load("forecast_data4")
+tar_load("alloscore1")
 ```
-
-Meeting with Nick 12/10
-
--   Went over data pull, thought process of what time periods to look at.
-
--   Big experimental idea:
-
-    -   2 tests at the second week of the upswing for each epidemic
-
-    -   Set different K values for purposes of resource allocation - maybe 50k and 400k respectively?
-
-    -   From weeks, select eligible models + run with constraints.
-
-    -   Run
-
-    -   Evaluate. Look at the differences in relative case rates for the different counties - very noisy, some didn't have delta or omicron at all, etc.
 
 # Background
 
@@ -165,7 +146,7 @@ Additional considerations for the allocation score:
 
 ```{r echo=FALSE}
 
-truth_data_ca <- truth_data %>% filter(location_name == "California")
+truth_data_ca <- truth_data %>% filter(`location_name` == "California")
 
 dates_of_interest <- truth_data %>% filter(target_end_date == "2020-11-21" | 
                                              target_end_date == "2021-12-18") %>% 
@@ -393,7 +374,7 @@ countovertime_Dec18_2.5
 
 ## Resources to Allocate
 
-Initial decision was to set the resource restraint for Nov 21st 2020 at 50,000, but this seemed quite low (at least visually). Resource was set to 
+Initial decision was to set the resource restraint for Nov 21st 2020 at 50,000, but this seemed quite low (at least visually). Resource was set to
 
 ```{r warning=FALSE}
 ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
@@ -408,7 +389,364 @@ ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) +
 
 For each date, the selected models were run for weeks 1-4. Allocation scores were determined.
 
-## November 21st, 2021
+## November 21st, 2020
 
+```{r warning=FALSE, message=FALSE}
+# 1 week
+tar_load("Kat100k_alloscores1")
+tar_load("percap1_100")
+tar_load("score_data1")
+
+Kat100k_alloscores1 <- bind_rows(Kat100k_alloscores1, percap1_100 |> filter(`K` == 100000))
+
+alloscore_data_summaries1 <- Kat100k_alloscores1 |>
+  group_by(model, reference_date) |>
+  summarize(alloscore = sum(components), yobs = sum(y)) |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 7)
+
+alloscore_models <- unique(alloscore_data_summaries1$model)
+score_data_summaries1 <- score_data1 |>
+  mutate(reference_date = target_end_date - 7) |>
+  filter(model %in% alloscore_models) |>
+  group_by(model, reference_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 7)
+
+all_scores1_100 <- left_join(alloscore_data_summaries1, score_data_summaries1,
+                      by=c("model", "target_end_date")) %>%
+  filter(reference_date.x=="2020-11-21")
+
+# 2 week
+tar_load("Kat100k_alloscores2")
+tar_load("percap2_100")
+tar_load("score_data2")
+
+Kat100k_alloscores2 <- bind_rows(Kat100k_alloscores2, percap2_100 |> filter(`K` == 100000))
+
+alloscore_data_summaries2 <- Kat100k_alloscores2 |>
+  group_by(model, reference_date) |>
+  summarize(alloscore = sum(components), yobs = sum(y)) |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 14)
+
+alloscore_models <- unique(alloscore_data_summaries2$model)
+score_data_summaries2 <- score_data2 |>
+  mutate(reference_date = target_end_date - 14) |>
+  filter(model %in% alloscore_models) |>
+  group_by(model, reference_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 14)
+
+all_scores2_100 <- left_join(alloscore_data_summaries2, score_data_summaries2,
+                      by=c("model", "target_end_date"))%>%
+  filter(reference_date.x=="2020-11-21")
+
+# 3 week
+
+tar_load("Kat100k_alloscores3")
+tar_load("percap3_100")
+tar_load("score_data3")
+
+Kat100k_alloscores3 <- bind_rows(Kat100k_alloscores3, percap3_100 |> filter(`K` == 100000))
+
+alloscore_data_summaries3 <- Kat100k_alloscores3 |>
+  group_by(model, reference_date) |>
+  summarize(alloscore = sum(components), yobs = sum(y)) |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 21)
+
+alloscore_models <- unique(alloscore_data_summaries2$model)
+score_data_summaries3 <- score_data3 |>
+  mutate(reference_date = target_end_date - 21) |>
+  filter(model %in% alloscore_models) |>
+  group_by(model, reference_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 21)
+
+all_scores3_100 <- left_join(alloscore_data_summaries3, score_data_summaries3,
+                      by=c("model", "target_end_date"))%>%
+  filter(reference_date.x=="2020-11-21")
+
+# 4 week
+
+tar_load("Kat100k_alloscores4")
+tar_load("percap4_100")
+tar_load("score_data4")
+
+Kat100k_alloscores4 <- bind_rows(Kat100k_alloscores4, percap3_100 |> filter(`K` == 100000))
+
+alloscore_data_summaries4 <- Kat100k_alloscores4 |>
+  group_by(model, reference_date) |>
+  summarize(alloscore = sum(components), yobs = sum(y)) |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 28)
+
+alloscore_models <- unique(alloscore_data_summaries2$model)
+score_data_summaries4 <- score_data4 |>
+  mutate(reference_date = target_end_date - 28) |>
+  filter(model %in% alloscore_models) |>
+  group_by(model, reference_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 28)
+
+all_scores4_100 <- left_join(alloscore_data_summaries4, score_data_summaries4,
+                      by=c("model", "target_end_date"))%>%
+  filter(reference_date.x=="2020-11-21")
+
+```
+
+```{r}
+
+summary1_100 <- all_scores1_100 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+kable(summary1_100, caption = "2020-11-21: Model scoring for the 1 week horizon (2020-11-28). Allocations conducted with a resource constraint of 100,000 units.")  
+  
+```
+
+```{r}
+summary2_100 <- all_scores2_100 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+kable(summary2_100, caption = "2020-11-21: Model scoring for the 2 week horizon (2020-12-05). Allocations conducted with a resource constraint of 100,000 units.")
+```
+
+```{r}
+summary3_100 <- all_scores3_100 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+kable(summary3_100, caption = "2020-11-21: Model scoring for the 3 week horizon (2020-12-12). Allocations conducted with a resource constraint of 100,000 units.")
+```
+
+```{r}
+summary4_100 <- all_scores4_100 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+kable(summary4_100, caption = "2020-11-21: Model scoring for the 4 week horizon (2020-12-19). Allocations conducted with a resource constraint of 100,000 units.")
+```
+
+## December 18th, 2021
+
+```{r warning=FALSE, message=FALSE}
+# 1 week
+tar_load("Kat400k_alloscores1")
+tar_load("percap1_400")
+tar_load("score_data1")
+
+Kat400k_alloscores1 <- bind_rows(Kat400k_alloscores1, percap1_400 |> filter(`K` == 400000))
+
+alloscore_data_summaries1 <- Kat400k_alloscores1 |>
+  group_by(model, reference_date) |>
+  summarize(alloscore = sum(components), yobs = sum(y)) |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 7)
+
+alloscore_models <- unique(alloscore_data_summaries1$model)
+score_data_summaries1 <- score_data1 |>
+  mutate(reference_date = target_end_date - 7) |>
+  filter(model %in% alloscore_models) |>
+  group_by(model, reference_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 7)
+
+all_scores1_400 <- left_join(alloscore_data_summaries1, score_data_summaries1,
+                      by=c("model", "target_end_date")) %>%
+  filter(reference_date.x=="2021-12-25")
+
+# 2 week
+tar_load("Kat400k_alloscores2")
+tar_load("percap2_400")
+tar_load("score_data2")
+
+Kat400k_alloscores2 <- bind_rows(Kat400k_alloscores2, percap2_400 |> filter(`K` == 400000))
+
+alloscore_data_summaries2 <- Kat400k_alloscores2 |>
+  group_by(model, reference_date) |>
+  summarize(alloscore = sum(components), yobs = sum(y)) |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 14)
+
+alloscore_models <- unique(alloscore_data_summaries2$model)
+score_data_summaries2 <- score_data2 |>
+  mutate(reference_date = target_end_date - 14) |>
+  filter(model %in% alloscore_models) |>
+  group_by(model, reference_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 14)
+
+all_scores2_400 <- left_join(alloscore_data_summaries2, score_data_summaries2,
+                      by=c("model", "target_end_date"))%>%
+  filter(reference_date.x=="2022-01-01")
+
+# 3 week
+
+tar_load("Kat400k_alloscores3")
+tar_load("percap3_400")
+tar_load("score_data3")
+
+Kat400k_alloscores3 <- bind_rows(Kat400k_alloscores3, percap3_400 |> filter(`K` == 400000))
+
+alloscore_data_summaries3 <- Kat400k_alloscores3 |>
+  group_by(model, reference_date) |>
+  summarize(alloscore = sum(components), yobs = sum(y)) |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 21)
+
+alloscore_models <- unique(alloscore_data_summaries2$model)
+score_data_summaries3 <- score_data3 |>
+  mutate(reference_date = target_end_date - 21) |>
+  filter(model %in% alloscore_models) |>
+  group_by(model, reference_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 21)
+
+all_scores3_400 <- left_join(alloscore_data_summaries3, score_data_summaries3,
+                      by=c("model", "target_end_date"))%>%
+  filter(reference_date.x=="2022-01-08")
+
+# 4 week
+
+tar_load("Kat400k_alloscores4")
+tar_load("percap4_400")
+tar_load("score_data4")
+
+Kat400k_alloscores4 <- bind_rows(Kat400k_alloscores4, percap3_400 |> filter(`K` == 400000))
+
+alloscore_data_summaries4 <- Kat400k_alloscores4 |>
+  group_by(model, reference_date) |>
+  summarize(alloscore = sum(components), yobs = sum(y)) |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 28)
+
+alloscore_models <- unique(alloscore_data_summaries2$model)
+score_data_summaries4 <- score_data4 |>
+  mutate(reference_date = target_end_date - 28) |>
+  filter(model %in% alloscore_models) |>
+  group_by(model, reference_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(reference_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, reference_date) |>
+  mutate(target_end_date = as.Date(reference_date) + 28)
+
+all_scores4_400 <- left_join(alloscore_data_summaries4, score_data_summaries4,
+                      by=c("model", "target_end_date"))%>%
+  filter(reference_date.x=="2022-01-15")
+
+```
+
+```{r}
+
+summary1_400 <- all_scores1_400 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+kable(summary1_400, caption = "2021-12-18: Model scoring for the 1 week horizon (2021-12-25). Allocations conducted with a resource constraint of 400,000 units.")  
+  
+```
+
+```{r}
+
+summary2_400 <- all_scores2_400 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+kable(summary2_400, caption = "2021-12-18: Model scoring for the 2 week horizon (2022-01-01). Allocations conducted with a resource constraint of 400,000 units.")  
+  
+```
+
+```{r}
+
+summary3_400 <- all_scores3_400 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+kable(summary3_400, caption = "2021-12-18: Model scoring for the 3 week horizon (2022-01-08). Allocations conducted with a resource constraint of 400,000 units.")  
+  
+```
+
+```{r}
+
+summary4_400 <- all_scores4_400 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+kable(summary4_400, caption = "2021-12-18: Model scoring for the 4 week horizon (2022-01-15). Allocations conducted with a resource constraint of 400,000 units.")  
+  
+```
 
 # Insights

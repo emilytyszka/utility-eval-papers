@@ -97,33 +97,61 @@ setup <- list(
    command = make_exponential_example_figure()
  ),
  tar_target(
-   name = Kat15k_alloscores1,
+   name = Kat100k_alloscores1,
    command = print(run_and_assemble_alloscores(forecast_data1,
                                          truth_data,
                                          reference_dates = values$forecast_dates[1:9], #it's erroring on 10th date - not sure why
                                          one_K = 100000))
  ),
  tar_target(
-   name = Kat15k_alloscores2,
+   name = Kat100k_alloscores2,
    command = print(run_and_assemble_alloscores(forecast_data2,
                                          truth_data,
                                          reference_dates = values$forecast_dates[1:9],
                                          one_K = 100000))
  ),
    tar_target(
-     name = Kat15k_alloscores3,
+     name = Kat100k_alloscores3,
      command = print(run_and_assemble_alloscores(forecast_data3,
                                            truth_data,
                                            reference_dates = values$forecast_dates[1:9],
                                            one_K = 100000))
    ),
      tar_target(
-       name = Kat15k_alloscores4,
+       name = Kat100k_alloscores4,
        command = print(run_and_assemble_alloscores(forecast_data4,
                                              truth_data,
                                              reference_dates = values$forecast_dates[1:9],
                                              one_K = 100000))
-     ) ,
+     ),
+ tar_target(
+   name = Kat400k_alloscores1,
+   command = print(run_and_assemble_alloscores(forecast_data1,
+                                               truth_data,
+                                               reference_dates = values$forecast_dates[1:9], #it's erroring on 10th date - not sure why
+                                               one_K = 400000))
+ ),
+ tar_target(
+   name = Kat400k_alloscores2,
+   command = print(run_and_assemble_alloscores(forecast_data2,
+                                               truth_data,
+                                               reference_dates = values$forecast_dates[1:9],
+                                               one_K = 400000))
+ ),
+ tar_target(
+   name = Kat400k_alloscores3,
+   command = print(run_and_assemble_alloscores(forecast_data3,
+                                               truth_data,
+                                               reference_dates = values$forecast_dates[1:9],
+                                               one_K = 400000))
+ ),
+ tar_target(
+   name = Kat400k_alloscores4,
+   command = print(run_and_assemble_alloscores(forecast_data4,
+                                               truth_data,
+                                               reference_dates = values$forecast_dates[1:9],
+                                               one_K = 400000))
+ ),
  tar_target(
    name = pops22,
    command = readxl::read_excel("data/CA_DeptOfFinance_PopEstim_2021-2025.xlsx", sheet = "Table 1 County State", skip = 2) |>
@@ -145,49 +173,49 @@ mapped1 <- tar_map(
   unlist = FALSE,
   values = values,
   tar_target(
-    alloscore,
+    alloscore1,
     run_alloscore_one_date(forecast_data1, truth_data, forecast_dates)
     ))
 mapped2 <- tar_map(
   unlist = FALSE,
   values = values,
   tar_target(
-    alloscore,
+    alloscore2,
     run_alloscore_one_date(forecast_data2, truth_data, forecast_dates)
   ))
 mapped3 <- tar_map(
   unlist = FALSE,
   values = values,
   tar_target(
-    alloscore,
+    alloscore3,
     run_alloscore_one_date(forecast_data3, truth_data, forecast_dates)
   ))
 mapped4 <- tar_map(
   unlist = FALSE,
   values = values,
   tar_target(
-    alloscore,
+    alloscore4,
     run_alloscore_one_date(forecast_data4, truth_data, forecast_dates)
   ))
 
 combined1 <- tar_combine(
   name = all_alloscore_data1,
-  mapped1[["alloscore"]],
+  mapped1[["alloscore1"]],
   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
 )
 combined2 <- tar_combine(
   name = all_alloscore_data2,
-  mapped2[["alloscore"]],
+  mapped2[["alloscore2"]],
   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
 )
 combined3 <- tar_combine(
   name = all_alloscore_data3,
-  mapped3[["alloscore"]],
+  mapped3[["alloscore3"]],
   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
 )
 combined4 <- tar_combine(
   name = all_alloscore_data4,
-  mapped4[["alloscore"]],
+  mapped4[["alloscore4"]],
   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
 )
 
@@ -196,24 +224,40 @@ combined4 <- tar_combine(
  #   command = plot_K_v_alloscore(alloscore_df),
  #   format = "file" )
 
- make_percap1 <- tar_target(
-   name = percap1,
-   command = score_per_capita_allocation(dat = Kat15k_alloscores1, pops = pops22)
+ make_percap1_100 <- tar_target(
+   name = percap1_100,
+   command = score_per_capita_allocation(dat = Kat100k_alloscores1, pops = pops22)
  )
- make_percap2 <- tar_target(
-   name = percap2,
-   command = score_per_capita_allocation(dat = Kat15k_alloscores2, pops = pops22)
+ make_percap2_100 <- tar_target(
+   name = percap2_100,
+   command = score_per_capita_allocation(dat = Kat100k_alloscores2, pops = pops22)
  )
- make_percap3 <- tar_target(
-   name = percap3,
-   command = score_per_capita_allocation(dat = Kat15k_alloscores3, pops = pops22)
+ make_percap3_100 <- tar_target(
+   name = percap3_100,
+   command = score_per_capita_allocation(dat = Kat100k_alloscores3, pops = pops22)
  )
- make_percap4 <- tar_target(
-   name = percap4,
-   command = score_per_capita_allocation(dat = Kat15k_alloscores4, pops = pops22)
+ make_percap4_100 <- tar_target(
+   name = percap4_100,
+   command = score_per_capita_allocation(dat = Kat100k_alloscores4, pops = pops22)
+ )
+ make_percap1_400 <- tar_target(
+   name = percap1_400,
+   command = score_per_capita_allocation(dat = Kat400k_alloscores1, pops = pops22)
+ )
+ make_percap2_400 <- tar_target(
+   name = percap2_400,
+   command = score_per_capita_allocation(dat = Kat400k_alloscores2, pops = pops22)
+ )
+ make_percap3_400 <- tar_target(
+   name = percap3_400,
+   command = score_per_capita_allocation(dat = Kat400k_alloscores3, pops = pops22)
+ )
+ make_percap4_400 <- tar_target(
+   name = percap4_400,
+   command = score_per_capita_allocation(dat = Kat400k_alloscores4, pops = pops22)
  )
 
-list(setup, mapped1, mapped2, mapped3, mapped4, combined1, combined2, combined3, combined4, make_percap1, make_percap2, make_percap3, make_percap4)
+list(setup, mapped1, mapped2, mapped3, mapped4, combined1, combined2, combined3, combined4, make_percap1_100, make_percap2_100, make_percap3_100, make_percap4_100, make_percap1_400, make_percap2_400, make_percap3_400, make_percap4_400)
 
 
 
