@@ -45,9 +45,9 @@ timehorizon4 <- 4
 ## create a group of alloscore targets
 ##values <- tidyr::expand_grid(models = mkeep, forecast_dates = forecast_dates)
 
-## set of required locations: all states + DC
+## set of required locations: all counties in CA
 reqd_locs <- hub_locations |>
-  dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA")) | geo_type == "state" & (abbreviation %in% c("CA"))) |>
+  dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA"))) |>
   dplyr::pull(fips)
 
 # Lists of targets:
