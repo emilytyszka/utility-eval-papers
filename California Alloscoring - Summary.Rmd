@@ -11,6 +11,7 @@ library(covidHubUtils)
 library(targets)
 library(ggbump)
 library(kableExtra)
+library(ggpubr)
 library(tidyverse)
 
 ### Score computation
@@ -26,13 +27,13 @@ tar_load("alloscore1")
 
 ## Forecast Scoring
 
-In recent decades, and especially following the onset of the COVID-19 pandemic, infectious disease forecasting has been of increasing interest to public health practitioners, governments, and executive-level decision-makers both within and outside of the healthcare and public health space. When forecasts produce advance estimates of disease burdens and resource use (such as healthcare visits and hospitalizations) that are accurate and actionable, leaders are able to make proactive policy and organizational decisions that lessen morbidity, prevent mortality, address needs related to disease outbreaks, and reduce avoidable resource waste. [Health departments and hospital use examples]
+In recent years, and especially following the onset of the COVID-19 pandemic, infectious disease forecasting has been of increasing interest to public health practitioners, governments, and executive-level decision-makers both within and outside of the healthcare and public health space. When forecasts produce advance estimates of disease burdens and resource use (such as healthcare visits and hospitalizations) that are accurate and actionable, leaders are able to make proactive policy and organizational decisions that lessen morbidity, prevent mortality, address needs related to disease outbreaks, and reduce avoidable resource waste. [Health departments and hospital use examples]
 
-In the development of these forecasts, teams utilize a wide range of inputs and methodologies, and as a result models may vary widely in their forecast accuracy. Furthermore, model performance may be context-specific - models that perform well in one setting or time period may produce inaccurate predictions and decisions in another, due to differences in the qualities of the population of interest, variation in data accuracy/timeliness, differences in disease dynamics, unaccounted-for variables, or other factors. For this reason, the question of what is the "best model" for a time or context requires standardized methods of scoring and assessment. In response to this need, a number of methods of model assessment have been developed, which quantitatively "score" forecasts on their success predicting outcomes.
+In the development of these forecasts, teams utilize a wide range of inputs and methodologies, and as a result models may vary widely in their forecast accuracy. Furthermore, model performance may be context-specific - models that perform well in one setting or time period may produce inaccurate predictions and decisions in another, due to differences in the qualities of the population of interest, variation in data accuracy/timeliness, changes in disease dynamics, unaccounted-for variables, or other factors. For this reason, the question of what is the "best model" for a time or context requires standardized methods of scoring and assessment. In response to this need, a number of methods of model assessment have been developed, which quantitatively "score" forecasts on their success predicting outcomes.
 
 ## Existing scoring methods
 
-Currently, a number of scoring methods exist across the infectious disease forecasting space. All methods evaluate a given forecast against the truth (the final outcome, of which the forecasters had no knowledge at time of prediction) for a given target (count at a date and time horizon) and then aggregate those into a total score for the model as a whole over the period tested. They are detailed briefly below:
+Currently, a number of scoring methods exist across the infectious disease forecasting space. All methods evaluate a given forecast against the *truth* (the final outcome, of which the forecasters had no knowledge at time of prediction) for a given target (count at a date and time horizon) and then aggregate those into a total score for the model as a whole over the period tested. They are detailed briefly below:
 
 -   **Mean Absolute Error (MAE)**: Mean absolute deviation of the prediction from the true value. On the same scale as the prediction. This measure uses point estimates only.
 
@@ -48,9 +49,9 @@ Currently, a number of scoring methods exist across the infectious disease forec
 
 ## Allocation Score
 
-When selecting a forecast or forecasts to make predictions of a given infectious disease outcome, the above methods can serve as quantitative measures of forecast accuracy, allowing for easy comparison between model performances. All of the existing methods described above, however, evaluate the forecasts entirely on whether [how correct]{.underline} a forecast's predictions can be considered to be, which may or may not translate to [well-informed decision-making]{.underline} when the model is applied in practice.
+When selecting a forecast or forecasts to make predictions of a given infectious disease outcome, the above methods can serve as quantitative measures of forecast accuracy, allowing for easy comparison between model performances. All of the existing methods described above, however, evaluate the forecasts entirely on whether [how correct]{.underline} a forecast's predictions can be considered to be, which may or may not translate to [well-informed decision-making]{.underline} when the model is applied in practice. In short, it is an issue of accuracy vs. utility.
 
-The allocation score, introduced by [Gerding et al. in 2024](https://academic.oup.com/jrsssa/article/188/4/1299/7927906), scores forecasts instead on their success in allocating limited medical resources across multiple locations. For a given forecast date and time horizon, an forecast is evaluated across all locations together.
+The allocation score, introduced by [Gerding et al. in 2024](https://academic.oup.com/jrsssa/article/188/4/1299/7927906), scores forecasts instead on their success in allocating limited medical resources across multiple locations. For a given forecast date and time horizon, an forecast is evaluated across all locations together, penalizing any instance where resources are underallocated to a location (relative to the best possible allocation).
 
 ### Overview:
 
@@ -62,9 +63,9 @@ In its simplest form, this scoring framework:
 
 3.  Determines the true need across all locations from the true counts (finalized after the forecasted date has passed)
 
-4.  Generates an ideal "oracle" distribution that would be made by a decision-maker with knowledge of the true need
+4.  Generates an ideal "oracle" distribution that would be made by a decision-maker with knowledge of the true need. If there are fewer resources than total need, this may underallocate resources, but this is considered to be unavoidable.
 
-5.  Calculates unmet need:
+5.  Calculates total avoidable unmet need:
 
     1.  [Total unmet need]{.underline}: Forecasts that distribute fewer units of resource than required in a given location leave unmet need. This is summed across all locations. Where more resources than are needed are allocated, this number is 0.
     2.  [Total unavoidable unmet need]{.underline}: In cases of resource constraints, it is not possible to distribute resources such that all locations meet their needs. If the oracle distribution requires more units of resource than exist in the distribution problem, the difference is defined as unavoidable unmet need. This is summed across all locations.
@@ -76,17 +77,17 @@ In its simplest form, this scoring framework:
 
 ### Example:
 
-Below, we see an simplified illustration of an allocation scoring scenario. In this scenario, 20,000 units of resources are to be distributed between 4 counties of different populations at a set point in time. 3 allocation methods are being scored: 1 allocation proportional to county population and allocation according to the predictions of 2 forecasts. On the far right, the oracle distribution is written in grey and exhibits 800 units of inevitable loss.
+Below, we see an simplified illustration of an allocation scoring scenario. In this scenario, 20,000 units of resources are to be distributed between 4 counties of different populations at a set point in time. 3 allocation methods are being scored: an allocation proportional to county population and two allocations according to the predictions of forecasts. On the far right, the oracle distribution is shown in grey - note that it exhibits 800 units of unavoidable unmet need.
 
 ![](Allocation%20Score%20Diagrams/1.png)
 
-The 3 allocations are scored by first determining the loss for each location and model (ie. tallying all underallocation - where the allocation is less than the true resource need). Overallocation is not penalized.
+The 3 allocations are scored by first determining the loss for each location and model (ie. tallying all unmet need - where the allocation is less than the true resource need). Overallocation is not penalized.
 
-For each allocation, this is summed, then unavoidable loss is subtracted from the value to give the alloscore. (For example, allocation by population had a total 3,000 units of loss - subtracting 800 gives the alloscore of 2,200.)
+For each allocation, this is summed, then unavoidable unmet need is subtracted from the value to give the alloscore. (For example, allocation by population had a total 3,000 units of need - subtracting 800 gives the alloscore of 2,200.)
 
 ![](Allocation%20Score%20Diagrams/2.png)
 
-With this method, we can treat the allocation by population as a control and judge our two forecasts with regards to how well they inform resource distribution decisions in the scenario of interest, compared to an allocation that ignores predicted disease burden - in this example, Forecast 1 scored better, while Forecast 2 scored worse.
+With this method, we can treat the allocation by population as a control method and judge our two forecasts with regards to how well they inform resource distribution decisions in the scenario of interest, compared to an allocation that ignores predicted disease burden - in this example, Forecast 1 scored better, while Forecast 2 scored worse.
 
 ### AS for Probabilistic Forecasts:
 
@@ -104,11 +105,11 @@ Additional considerations for the allocation score:
 
 -   "At its core, the AS measures whether the forecast accurately captures the relative magnitudes of resource need across different locations, which is precisely the information that is needed to allocate resources to those locations subject to a fixed resource constraint." - Gerding et al.
 
--   The raw numerical values of the allocation score are dependent upon the resource constraint established when selecting K. All else being equal, with a lower selected K we can expect a higher AS, since there are a lower number of resources to distribute relative to observed need.
+-   The numerical values of the allocation score are dependent upon the resource constraint established when selecting K. All else being equal, with a selected K that is closer to true need, we can expect a higher AS because allocation decisions matter more: not only is there the potential for unmet need, but it is avoidable with better-informed decision-making.
 
     -   As a result of this, it should be noted that raw AS values *between* experiments are not comparable. Two compare the raw AS values of two forecasts, they should be subjected to the same experiment.
 
-    -   As an additional extension to the AS, the calculation of **Integrated Allocation Score (IAS)** addresses uncertainty with regards to resource levels. This score is generated by determining AS across a grid of discrete possible K values, weighed by their probabilities. (CHECK HOW THE CODE RAN THIS - WHAT IS MIN AND MAX K? WHAT P(K) DISTRIB USED TO WEIGH?)
+    -   As an additional extension to the AS, the calculation of **Integrated Allocation Score (IAS)** addresses uncertainty with regards to resource levels. This score is generated by determining AS across a grid of discrete possible K values, weighed by their probabilities.
 
 # Project Justification and Goals
 
@@ -155,29 +156,152 @@ Additional considerations for the allocation score:
 
 # Time Period of Interest
 
-## Statewide
+```{r echo=FALSE, warning=FALSE}
 
-```{r echo=FALSE}
+truth_data_ca <- truth_data %>% filter(location_name == "California")
 
-truth_data_ca <- truth_data %>% filter(`location_name` == "California")
 
-dates_of_interest <- truth_data %>% filter(target_end_date == "2020-11-21" | 
-                                             target_end_date == "2021-12-18") %>% 
-  filter(location_name == "California")
+dates_lowinfo <- truth_data_ca %>% filter(target_end_date == "2020-10-31" | 
+                                          target_end_date == "2020-11-07" | 
+                                          target_end_date == "2021-12-11" | 
+                                          target_end_date == "2021-12-18")
+dates_highinfo <- truth_data_ca %>% filter(target_end_date == "2020-11-14" |
+                                           target_end_date == "2020-11-21" |
+                                           target_end_date == "2021-12-25" |
+                                           target_end_date == "2022-01-01")
 
-horizons_of_interest <- truth_data %>% filter(target_end_date == "2020-11-28" | 
+
+datesbyinfo <- ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
+  geom_point(color="grey80") + 
+  geom_line(color="grey80") + 
+  labs(title = "Forecast Dates by Information Level", x = "MMWR Week End Date", y ="Weekly Incident Cases") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  geom_point(data = dates_lowinfo, aes(x=target_end_date, y=value), color="orange2") + 
+  geom_point(data = dates_highinfo, aes(x=target_end_date, y=value), color="forestgreen") + 
+  geom_label(aes(label= "Low: 10/31/2020 + 11/07/2020 ", y=300000, x=as.Date("2020-06-01")), size=3) + 
+  geom_label(aes(label= "High: 11/14/2020 + 11/21/2020 ", y=250000, x=as.Date("2020-06-01")), size=3) +
+  geom_label(aes(label= "Low: 12/11/2021 + 12/18/2021 ", y=300000, x=as.Date("2022-09-01")), size=3) + 
+  geom_label(aes(label= "High: 12/25/2021 + 01/01/2022 ", y=250000, x=as.Date("2022-09-01")), size=3)
+
+datesbyinfo
+
+```
+
+
+```{r echo=FALSE, warning=FALSE}
+
+# First row: 10/31/2020 and 12/11/21 (low info)
+dates_of_interest <- truth_data_ca %>% filter(target_end_date == "2020-10-31" | 
+                                             target_end_date == "2021-12-11")
+horizons_of_interest <- truth_data_ca %>% filter(target_end_date == "2020-11-07" | 
+                                                target_end_date == "2020-11-14" |
+                                                target_end_date == "2020-11-21" |
+                                                target_end_date == "2020-11-28" |
+                                             target_end_date == "2021-12-18"|
+                                             target_end_date == "2021-12-25"|
+                                             target_end_date == "2022-01-01"|
+                                             target_end_date == "2022-01-08")
+
+# Second row: 11/07/2020 and 12/18/21 (low info)
+dates_of_interest2 <- truth_data_ca %>% filter(target_end_date == "2020-11-07" | 
+                                             target_end_date == "2021-12-18")
+horizons_of_interest2 <- truth_data_ca %>% filter(target_end_date == "2020-11-14" |
+                                                target_end_date == "2020-11-21" |
+                                                target_end_date == "2020-11-28" |
                                                 target_end_date == "2020-12-05" |
-                                                target_end_date == "2020-12-12" |
-                                                target_end_date == "2020-12-19" |
                                              target_end_date == "2021-12-25"|
                                              target_end_date == "2022-01-01"|
                                              target_end_date == "2022-01-08"|
-                                             target_end_date == "2022-01-15") %>% 
-  filter(location_name == "California")
+                                             target_end_date == "2022-01-15")
 
-ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
-  geom_point(color="grey75") + geom_line(color="grey75") + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Statewide Weekly Incident COVID-19 Cases", subtitle = "cyan = forecast date; pink = target dates")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + geom_point(data = dates_of_interest, aes(x=target_end_date, y=value), color="#00BFC4") + geom_point(data = horizons_of_interest, aes(x=target_end_date, y=value), color="#C77CFF")
+# Third row: 11/14/2020 and 12/25/21 (high info)
+dates_of_interest3 <- truth_data_ca %>% filter(target_end_date == "2020-11-14" | 
+                                             target_end_date == "2021-12-25")
+horizons_of_interest3 <- truth_data_ca %>% filter(target_end_date == "2020-11-21" |
+                                                target_end_date == "2020-11-28" |
+                                                target_end_date == "2020-12-05" |
+                                                target_end_date == "2020-12-12" |
+                                             target_end_date == "2022-01-01"|
+                                             target_end_date == "2022-01-08"|
+                                             target_end_date == "2022-01-15"|
+                                             target_end_date == "2022-01-22")
 
+# Fourth row: 11/21/2020 and 01/01/22 (high info)
+dates_of_interest4 <- truth_data_ca %>% filter(target_end_date == "2020-11-21" | 
+                                             target_end_date == "2022-01-01")
+horizons_of_interest4 <- truth_data_ca %>% filter(target_end_date == "2020-11-28" |
+                                                target_end_date == "2020-12-05" |
+                                                target_end_date == "2020-12-12" |
+                                                target_end_date == "2020-12-19" |
+                                             target_end_date == "2022-01-08"|
+                                             target_end_date == "2022-01-15"|
+                                             target_end_date == "2022-01-22"|
+                                             target_end_date == "2022-01-29")
+
+dategroup1 <- ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
+  geom_point(color="grey75") + 
+  geom_line(color="grey75") + 
+  labs(title = "2020-10-31 and 2021-12-11", x = "MMWR Week End Date", y ="Weekly Incident Cases") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  geom_point(data = dates_of_interest, aes(x=target_end_date, y=value), color="#00BFC4") + 
+  geom_point(data = horizons_of_interest, aes(x=target_end_date, y=value), color="#C77CFF") +  
+  geom_segment(aes(x = as.Date("2021-10-15"), y = 200000, xend = as.Date("2022-04-15"), 
+                   yend = 200000), size=1, colour = "#7CAE00") + 
+  geom_label(aes(label= "200,0000", y=250000, x=as.Date("2021-08-01")), size=3) +
+  geom_segment(aes(x = as.Date("2020-09-15"), y = 100000, xend = as.Date("2021-04-15"), 
+                   yend = 100000), size=1, colour = "#7CAE00") + 
+  geom_label(aes(label= "100,0000", y=150000, x=as.Date("2020-06-15")), size=3)
+
+dategroup2 <- ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
+  geom_point(color="grey75") + 
+  geom_line(color="grey75") + 
+  labs(title = "2020-11-07 and 2021-12-18", x = "MMWR Week End Date", y ="Weekly Incident Cases")  + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  geom_point(data = dates_of_interest2, aes(x=target_end_date, y=value), color="#00BFC4") + 
+  geom_point(data = horizons_of_interest2, aes(x=target_end_date, y=value), color="#C77CFF") +  
+  geom_segment(aes(x = as.Date("2021-10-15"), y = 200000, xend = as.Date("2022-04-15"), 
+                   yend = 200000), size=1, colour = "#7CAE00") + 
+  geom_label(aes(label= "200,0000", y=250000, x=as.Date("2021-08-01")), size=3) +
+  geom_segment(aes(x = as.Date("2020-09-15"), y = 100000, xend = as.Date("2021-04-15"), 
+                   yend = 100000), size=1, colour = "#7CAE00") + 
+  geom_label(aes(label= "100,0000", y=150000, x=as.Date("2020-06-15")), size=3)
+
+dategroup3 <- ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
+  geom_point(color="grey75") + 
+  geom_line(color="grey75") + 
+  labs(title = "2020-11-14 and 2021-12-25", x = "MMWR Week End Date", y ="Weekly Incident Cases") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  geom_point(data = dates_of_interest3, aes(x=target_end_date, y=value), color="#00BFC4") + 
+  geom_point(data = horizons_of_interest3, aes(x=target_end_date, y=value), color="#C77CFF") +  
+  geom_segment(aes(x = as.Date("2021-10-15"), y = 200000, xend = as.Date("2022-04-15"), 
+                   yend = 200000), size=1, colour = "#7CAE00") + 
+  geom_label(aes(label= "200,0000", y=250000, x=as.Date("2021-08-01")), size=3) +
+  geom_segment(aes(x = as.Date("2020-09-15"), y = 100000, xend = as.Date("2021-04-15"), 
+                   yend = 100000), size=1, colour = "#7CAE00") + 
+  geom_label(aes(label= "100,0000", y=150000, x=as.Date("2020-06-15")), size=3)
+
+dategroup4 <- ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
+  geom_point(color="grey75") + 
+  geom_line(color="grey75") + 
+  labs(title = "2020-11-21 and 2022-01-01", x = "MMWR Week End Date", y ="Weekly Incident Cases") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  geom_point(data = dates_of_interest4, aes(x=target_end_date, y=value), color="#00BFC4") + 
+  geom_point(data = horizons_of_interest4, aes(x=target_end_date, y=value), color="#C77CFF") +  
+  geom_segment(aes(x = as.Date("2021-10-15"), y = 200000, xend = as.Date("2022-04-15"), 
+                   yend = 200000), size=1, colour = "#7CAE00") + 
+  geom_label(aes(label= "200,0000", y=250000, x=as.Date("2021-08-01")), size=3) +
+  geom_segment(aes(x = as.Date("2020-09-15"), y = 100000, xend = as.Date("2021-04-15"), 
+                   yend = 100000), size=1, colour = "#7CAE00") + 
+  geom_label(aes(label= "100,0000", y=150000, x=as.Date("2020-06-15")), size=3)
+
+dategroupsall <- ggarrange(dategroup1, dategroup2, dategroup3, dategroup4, nrow = 2, ncol=2)
+annotate_figure(dategroupsall,
+                top = text_grob("Resource Constraints vs Statewide Weekly Incident COVID-19 Cases", color = "black", size = 14))
 
 ```
 
@@ -193,37 +317,12 @@ We will therefore visualize, by forecast date + quantile, how many predictions e
 
 ```{r include=FALSE, echo=FALSE}
 
-# locations - CA state + CA county
-data("hub_locations")
-locations <- hub_locations |>
-  dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA")) ) |>
-  dplyr::pull(fips)
-values <- c(forecast_dates = c(as.Date("2020-11-21"), as.Date("2021-12-16"), as.Date("2021-12-17"),
-                               as.Date("2021-12-18"), as.Date("2021-12-19"), as.Date("2021-12-20"), 
-                               as.Date("2021-12-21")))
-allforecasts <- load_forecasts(
-    dates = values,
-    date_window_size = 6,
-    #models = "COVIDhub-ensemble",
-    locations = locations,
-    types = c("quantile"),
-    targets = paste(1:4, "wk ahead inc case"),
-    source = "zoltar",
-    verbose = FALSE,
-    as_of = NULL,
-    hub = c("US"))
+allforecasts <- rbind(forecast_data1, forecast_data2, forecast_data3, forecast_data4)
 
-## Test if pull looks good
-# california <- allforecasts %>% filter(location_name == "California")
-# counties <- allforecasts %>% filter(location_name != "California")
-# head(counties)
-
-## For a given model, quantile, and horizon (in weeks), what is the date-by-date count of predictions? 
-##California has 58 counties, so counties + statewide would be 59 predictions - that would be an ideal number to shoot for.
-
-pointestimatecompleteness <- as.data.frame(table(allforecasts$model, allforecasts$forecast_date, allforecasts$horizon, allforecasts$quantile))
-pointestimatecompleteness <- rename(as_tibble(pointestimatecompleteness), Model = Var1, Date = Var2, "Horizon (Weeks)" = Var3, Quantile = Var4)
-
+# table by model, forecast week, horizon, and quantile
+pointestimatecompleteness <- as.data.frame(table(allforecasts$model, allforecasts$target_end_date,
+                                                 allforecasts$horizon, allforecasts$quantile))
+pointestimatecompleteness <- rename(as_tibble(pointestimatecompleteness), Model = Var1, Date = Var2, Horizon = Var3, Quantile = Var4)
 pointestimatecompleteness$Freq <- as.numeric(pointestimatecompleteness$Freq)
 pointestimatecompleteness <- pointestimatecompleteness %>% dplyr::mutate(FreqDiscrete = case_when(
   Freq==0 ~ "No Prediction",
@@ -242,83 +341,229 @@ pointestimatecompleteness$FreqDiscrete <- factor(pointestimatecompleteness$FreqD
                                                             "58-99 Predictions", 
                                                             "100-200 Predictions",
                                                             "Over 200 Predictions"))
-
-
 pointestimatecompleteness$Date <- as.Date(pointestimatecompleteness$Date)
+
+# 2020
+pointestimatecompleteness_10_31_2020 <- pointestimatecompleteness %>% filter(Date == "2020-11-07" & Horizon == 1 |
+                                                                       Date == "2020-11-14" & Horizon == 2 |  
+                                                                       Date == "2020-11-21" & Horizon == 3 |
+                                                                       Date == "2020-11-28" & Horizon == 4)
+pointestimatecompleteness_11_07_2020 <- pointestimatecompleteness %>% filter(Date == "2020-11-14" & Horizon == 1 |
+                                                                       Date == "2020-11-21" & Horizon == 2 |  
+                                                                       Date == "2020-11-28" & Horizon == 3 |
+                                                                       Date == "2020-12-05" & Horizon == 4)
+pointestimatecompleteness_11_14_2020 <- pointestimatecompleteness %>% filter(Date == "2020-11-21" & Horizon == 1 |
+                                                                       Date == "2020-11-28" & Horizon == 2 |
+                                                                       Date == "2020-12-05" & Horizon == 3 |  
+                                                                       Date == "2020-12-12" & Horizon == 4 )
+pointestimatecompleteness_11_21_2020 <- pointestimatecompleteness %>% filter(Date == "2020-11-28" & Horizon == 1 |
+                                                                       Date == "2020-12-05" & Horizon == 2 |  
+                                                                       Date == "2020-12-12" & Horizon == 3 |
+                                                                       Date == "2020-12-19" & Horizon == 4)
+
+# 2021
+pointestimatecompleteness_12_11_2021 <- pointestimatecompleteness %>% filter(Date == "2021-12-18" & Horizon == 1 |
+                                                                       Date == "2021-12-25" & Horizon == 2 |  
+                                                                       Date == "2022-01-01" & Horizon == 3 |
+                                                                       Date == "2022-01-08" & Horizon == 4)
+pointestimatecompleteness_12_18_2021 <- pointestimatecompleteness %>% filter(Date == "2021-12-25" & Horizon == 1 |
+                                                                       Date == "2022-01-01" & Horizon == 2 |  
+                                                                       Date == "2022-01-08" & Horizon == 3 |
+                                                                       Date == "2022-01-15" & Horizon == 4)
+pointestimatecompleteness_12_25_2021 <- pointestimatecompleteness %>% filter(Date == "2022-01-01" & Horizon == 1 |
+                                                                       Date == "2022-01-08" & Horizon == 2 |
+                                                                       Date == "2022-01-15" & Horizon == 3 |  
+                                                                       Date == "2022-01-22" & Horizon == 4 )
+pointestimatecompleteness_01_01_2022 <- pointestimatecompleteness %>% filter(Date == "2022-01-08" & Horizon == 1 |
+                                                                       Date == "2022-01-15" & Horizon == 2 |  
+                                                                       Date == "2022-01-22" & Horizon == 3 |
+                                                                       Date == "2022-01-29" & Horizon == 4)
+
 library(viridis)
+
+# Graphing function 
+
+plotcompleteness <- function(data, quantile) { 
+data %>%
+  filter(Quantile == quantile) %>% ggplot(aes(y=Model, x=Horizon, fill=FreqDiscrete))+
+  geom_tile(color= "white") + 
+  scale_fill_viridis(name="Count of Predictions (Counties = 58)", direction=-1, discrete=TRUE) + 
+  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
+  ggtitle("Count of Submissions by Model and Horizon", 
+          subtitle = paste("Quantile =", quantile))
+}
 
 ```
 
-### November 21st, 2020 {.tabset}
 
-The 50% and 2.5% quantiles show the same number of reports in total for each For the November 21st, 2020 date, we see forecasts reported for the following:
-
--   UVA-Ensemble
-
--   JHUAPL-Bucky
-
--   COVIDhub-ensemble
-
--   COVIDhub-baseline
-
--   COVIDhub-4_week_ensemble
-
--   COVIDhub_CDC-ensemble
-
--   CEID-Walk
-
-***However***, we can see here that there are multiple COVID Hub ensembles being reported. We will select the 4 week ensemble, resulting in the following 4 models to examine for this forecast date:
-
--   **UVA-Ensemble**
-
--   **JHUAPL-Bucky**
-
--   **COVIDhub-4_week_ensemble**
-
--   **CEID-Walk**
+### October 31st, 2020 {.tabset}
 
 #### 50%
 
 ```{r echo=FALSE}
-countovertime_Nov21_50 <- pointestimatecompleteness %>% filter(Quantile == 0.5, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
-  geom_tile(color= "white") + 
-  scale_fill_viridis(name="Count of Predictions (Counties = 58)", direction=-1, discrete=TRUE) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.500")
-countovertime_Nov21_50
+
+plotcompleteness(pointestimatecompleteness_10_31_2020, 0.5)
+
 ```
 
 #### 25%
 
 ```{r echo=FALSE}
-countovertime_Nov21_25 <- pointestimatecompleteness %>% filter(Quantile == 0.25, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
-  geom_tile(color= "white") + 
-  scale_fill_viridis(name="Count of Predictions (Counties = 58)", direction=-1, discrete=TRUE) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.250")
-countovertime_Nov21_25
+
+plotcompleteness(pointestimatecompleteness_10_31_2020, 0.25)
+
 ```
 
 #### 10%
 
 ```{r echo=FALSE}
-countovertime_Nov21_10 <- pointestimatecompleteness %>% filter(Quantile == 0.10, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
-  geom_tile(color= "white") + 
-  scale_fill_viridis(name="Count of Predictions (Counties = 58)", direction=-1, discrete=TRUE) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.100")
-countovertime_Nov21_10
+
+plotcompleteness(pointestimatecompleteness_10_31_2020, 0.1)
+
 ```
 
 #### 2.5%
 
 ```{r echo=FALSE}
-countovertime_Nov21_2.5 <- pointestimatecompleteness %>% filter(Quantile == 0.025, Date == "2020-11-16") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
-  geom_tile(color= "white") + 
-  scale_fill_viridis(name="Count of Predictions (Counties = 58)", direction=-1, discrete=TRUE) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2020-11-16: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.025")
-countovertime_Nov21_2.5
+
+plotcompleteness(pointestimatecompleteness_10_31_2020, 0.025)
+
+```
+
+### November 7th, 2020 {.tabset}
+
+#### 50%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_07_2020, 0.5)
+
+```
+
+#### 25%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_07_2020, 0.25)
+
+```
+
+#### 10%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_07_2020, 0.1)
+
+```
+
+#### 2.5%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_07_2020, 0.025)
+
+```
+
+### November 14th, 2020 {.tabset}
+
+#### 50%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_14_2020, 0.5)
+
+```
+
+#### 25%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_14_2020, 0.25)
+
+```
+
+#### 10%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_14_2020, 0.1)
+
+```
+
+#### 2.5%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_14_2020, 0.025)
+
+```
+
+### November 21st, 2020 {.tabset}
+
+#### 50%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_21_2020, 0.5)
+
+```
+
+#### 25%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_21_2020, 0.25)
+
+```
+
+#### 10%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_21_2020, 0.1)
+
+```
+
+#### 2.5%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_11_21_2020, 0.025)
+
+```
+
+### December 11th, 2021 {.tabset}
+
+#### 50%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_12_11_2021, 0.5)
+
+```
+
+#### 25%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_12_11_2021, 0.25)
+
+```
+
+#### 10%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_12_11_2021, 0.1)
+
+```
+
+#### 2.5%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_12_11_2021, 0.025)
+
 ```
 
 ### December 18th, 2021 {.tabset}
@@ -327,45 +572,100 @@ countovertime_Nov21_2.5
 
 ```{r echo=FALSE}
 
-countovertime_Dec19_50 <- pointestimatecompleteness %>% filter(Quantile == 0.5, Date == "2021-12-19") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
-  geom_tile(color= "white") + 
-  scale_fill_viridis(name="Count of Predictions (Counties = 58)", direction=-1, discrete=TRUE) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2021-12-19: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.500")
-countovertime_Dec19_50
+plotcompleteness(pointestimatecompleteness_12_18_2021, 0.5)
+
 ```
 
 #### 25%
 
 ```{r echo=FALSE}
-countovertime_Dec19_25 <- pointestimatecompleteness %>% filter(Quantile == 0.25, Date == "2021-12-19") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
-  geom_tile(color= "white") + 
-  scale_fill_viridis(name="Count of Predictions (Counties = 58)", direction=-1, discrete=TRUE) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2021-12-19: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.250")
-countovertime_Dec19_25
+
+plotcompleteness(pointestimatecompleteness_12_18_2021, 0.25)
+
 ```
 
 #### 10%
 
 ```{r echo=FALSE}
-countovertime_Dec19_10 <- pointestimatecompleteness %>% filter(Quantile == 0.10, Date == "2021-12-19") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
-  geom_tile(color= "white") + 
-  scale_fill_viridis(name="Count of Predictions (Counties = 58)", direction=-1, discrete=TRUE) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2021-12-19: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.100")
-countovertime_Dec19_10
+
+plotcompleteness(pointestimatecompleteness_12_18_2021, 0.1)
+
 ```
 
 #### 2.5%
 
 ```{r echo=FALSE}
-countovertime_Dec19_2.5 <- pointestimatecompleteness %>% filter(Quantile == 0.025, Date == "2021-12-19") %>% ggplot(aes(y=Model, x=`Horizon (Weeks)`, fill=FreqDiscrete))+
-  geom_tile(color= "white") + 
-  scale_fill_viridis(name="Count of Predictions (Counties = 58)", direction=-1, discrete=TRUE) + 
-  theme(axis.text.x = element_text(angle = 45, vjust = .5, hjust = .5)) +
-  ggtitle("2021-12-19: Count of Submissions by Model and Horizon", subtitle = "Quantile = 0.025")
-countovertime_Dec19_2.5
+
+plotcompleteness(pointestimatecompleteness_12_18_2021, 0.025)
+
+```
+
+### December 25th, 2021 {.tabset}
+
+#### 50%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_12_25_2021, 0.5)
+
+```
+
+#### 25%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_12_25_2021, 0.25)
+
+```
+
+#### 10%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_12_25_2021, 0.1)
+
+```
+
+#### 2.5%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_12_25_2021, 0.025)
+
+```
+
+### January 1st, 2022 {.tabset}
+
+#### 50%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_01_01_2022, 0.5)
+
+```
+
+#### 25%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_01_01_2022, 0.25)
+
+```
+
+#### 10%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_01_01_2022, 0.1)
+
+```
+
+#### 2.5%
+
+```{r echo=FALSE}
+
+plotcompleteness(pointestimatecompleteness_01_01_2022, 0.025)
+
 ```
 
 ## Per-Capita Estimate: California Population Data
@@ -378,29 +678,143 @@ California population data were sourced via the CA Department of Finance ([link 
 
 For the two periods, resource constraints were set so that it would be difficult/impossible to avoid underallocation across the locations. Recall that in situations of ample resources, allocation scores can be 0, since loss is easier to avoid, and in situations of very scarce resources, the unavoidable loss is very high and can make up the bulk of the loss value, also leading to lower allocation scores. In contrast, as resources get closer to true need, allocation scores can be expected to rise - the scare resources mean that the decision-making is very important. Again, the raw allocation scores of the experiment do not matter (the comparison is between scores of different models evaluated in the same experiment), but experimental setups that establish a resource constraint closer to the true need will avoid scores of 0 and therefore make interpretation of the scores more meaningful.
 
+
+
+
+For these reasons, we established resource constraints of 100,000 units and 200,000 units respectively for the XXXX
+
+# Allocation Score
 ```{r warning=FALSE, echo=FALSE}
+
 ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
-  geom_point(color="grey75") + geom_line(color="grey75") + labs(x = "MMWR Week End Date", y ="Weekly Incident Cases", title = "California: Statewide Weekly Incident COVID-19 Cases", subtitle = "Horizonal lines show resource constraints")  + theme_bw() + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + geom_point(data = dates_of_interest, aes(x=target_end_date, y=value), color="#00BFC4") + geom_point(data = horizons_of_interest, aes(x=target_end_date, y=value), color="#C77CFF") +  
-  geom_segment(aes(x = as.Date("2021-10-15"), y = 200000, xend = as.Date("2022-04-15"), yend = 200000), size=1, colour = "#7CAE00") + 
-  geom_label(aes(label= "200,0000", y=200000, x=as.Date("2021-08-15")), size=3) +
-  geom_segment(aes(x = as.Date("2020-09-15"), y = 100000, xend = as.Date("2021-04-15"), yend = 100000), size=1, colour = "#7CAE00") + 
-  geom_label(aes(label= "100,0000", y=100000, x=as.Date("2020-07-15")), size=3)
+  geom_point(color="grey80") + 
+  geom_line(color="grey80") + 
+  labs(title = "Forecast Dates by Information Level", x = "MMWR Week End Date", y ="Weekly Incident Cases") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + 
+  geom_point(data = dates_lowinfo, aes(x=target_end_date, y=value), color="orange2") + 
+  geom_point(data = dates_highinfo, aes(x=target_end_date, y=value), color="forestgreen") +  
+  geom_segment(aes(x = as.Date("2021-10-15"), y = 200000, xend = as.Date("2022-04-15"), 
+                   yend = 200000), size=0.5, colour = "mediumpurple1") + 
+  geom_segment(aes(x = as.Date("2020-09-15"), y = 100000, xend = as.Date("2021-04-15"), 
+                   yend = 100000), size=0.5, colour = "mediumpurple1")
 ```
-
-For these reasons, we established resource constraints of 100,000 units and 200,000 units respectively for the
-
-# Results
 
 For each date, the selected models were run for weeks 1-4. Allocation scores were determined.
 
-## November 21st, 2020 {.tabset}
+## Location-wise Allocation Over Time
+
+```{r echo=FALSE}
+
+loc_to_plot <- "Orange County, CA"
+date <- "2020-11-21"
+
+ordered_levels <- truth_data |>
+  filter(location != "06") |>
+  select(location, full_location_name, value, target_end_date) |>
+  mutate(target_end_date = as.Date(target_end_date, "%Y-%m-%d")) |>
+  arrange(target_end_date)
+
+tar_load("Kat100k_alloscores1")
+tar_load("percap1_100")
+tar_load("Kat200k_alloscores1")
+tar_load("percap1_200")
+tar_load("score_data1")
+tar_load("Kat100k_alloscores2")
+tar_load("percap2_100")
+tar_load("Kat200k_alloscores2")
+tar_load("percap2_200")
+tar_load("score_data2")
+tar_load("Kat100k_alloscores3")
+tar_load("percap3_100")
+tar_load("Kat200k_alloscores3")
+tar_load("percap3_200")
+tar_load("score_data3")
+tar_load("Kat100k_alloscores4")
+tar_load("percap4_100")
+tar_load("Kat200k_alloscores4")
+tar_load("percap4_200")
+tar_load("score_data4")
+Kat100k_alloscores1$horizon <- 1
+Kat100k_alloscores2$horizon <- 2
+Kat100k_alloscores3$horizon <- 3
+Kat100k_alloscores4$horizon <- 4
+Kat200k_alloscores1$horizon <- 1
+Kat200k_alloscores2$horizon <- 2
+Kat200k_alloscores3$horizon <- 3
+Kat200k_alloscores4$horizon <- 4
+
+Kat100k_alloscores <- rbind(Kat100k_alloscores1, Kat100k_alloscores2, 
+                            Kat100k_alloscores3, Kat100k_alloscores4) |>  
+                      mutate(target_end_date = as.Date(reference_date)+horizon*7) 
+Kat200k_alloscores <- rbind(Kat200k_alloscores1, Kat200k_alloscores2, 
+                            Kat200k_alloscores3, Kat200k_alloscores4) |>  
+                      mutate(target_end_date = as.Date(reference_date)+horizon*7) 
+Alloscores_all <- rbind(Kat100k_alloscores, Kat200k_alloscores)
+
+plotallocation <- function(data, loc_to_plot, date) { 
+multiloc_dat <- Alloscores_all |>
+  filter(full_location_name == loc_to_plot) |>
+  rename(allocation = x, `observed resource need` = y) |>
+  mutate(`unmet resource need` = ifelse(allocation < `observed resource need`,
+                                        `observed resource need` - allocation,
+                                        0),
+         `need met by allocated resources` = ifelse(allocation < `observed resource need`,
+                                                    allocation,
+                                                    `observed resource need`),
+         `allocation exceeding need` = ifelse(allocation < `observed resource need`,
+                                        0,
+                                        allocation - `observed resource need`)
+         ) |>
+  # select(model, reference_date, state, allocation, `observed resource need`) |>
+  select(model, K, reference_date, target_end_date, full_location_name,
+         `unmet resource need`, `need met by allocated resources`, `allocation exceeding need`) |>
+  pivot_longer(cols = 
+                 c("unmet resource need", "need met by allocated resources", "allocation exceeding need")) 
+multiloc_dat$name <- factor(multiloc_dat$name, 
+         levels = c("unmet resource need", "allocation exceeding need", "need met by allocated resources"))
+
+Kvalue <- multiloc_dat %>% filter(reference_date == date) %>% select(K)
+K <- as.numeric(Kvalue[1,1])
+
+alloc_plot<- ggplot(multiloc_dat %>% filter(reference_date == date), 
+                     aes(x=target_end_date, y=value, fill=name)) +
+  geom_col(position="stack", alpha=1) +
+  scale_fill_manual(name=NULL, values = c("#fb6a4a", "#9ecae1", "#807dba")) +
+  theme(axis.text.x=element_text(angle=90,vjust=.5), legend.justification = c(1,1), legend.key.size = unit(0.45, "cm"), legend.background = element_rect(fill = "transparent")) +
+  ylab("Resource need and allocation") +
+  xlab(NULL) + 
+  ggtitle(paste0(loc_to_plot," on ",date," (",scales::number(K, big.mark = ",")," units)")) +
+  facet_wrap(vars(model))
+
+return(alloc_plot)
+
+}
+```
+
+```{r warning=FALSE, message=FALSE, echo=FALSE}
+
+#levels(as.factor(Alloscores_all$full_location_name))
+
+plotallocation(data = Alloscores_all, loc_to_plot = "Los Angeles County, CA", 
+               date = "2020-10-31")
+plotallocation(data = Alloscores_all, loc_to_plot = "Santa Barbara County, CA", 
+               date = "2020-10-31")
+plotallocation(data = Alloscores_all, loc_to_plot = "Calaveras County, CA", 
+               date = "2020-10-31")
+plotallocation(data = Alloscores_all, loc_to_plot = "Siskiyou County, CA", 
+               date = "2020-10-31")
+
+```
 
 ```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+# Data Prep 
+
 # 1 week
 tar_load("Kat100k_alloscores1")
 tar_load("percap1_100")
 tar_load("score_data1")
-
 Kat100k_alloscores1 <- bind_rows(Kat100k_alloscores1, percap1_100 |> filter(`K` == 100000))
 
 alloscore_data_summaries1 <- Kat100k_alloscores1 |>
@@ -416,7 +830,8 @@ alloscore_data_summaries1 <- Kat100k_alloscores1 |>
          allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
   ungroup() |>
   complete(model, reference_date) |>
-  mutate(target_end_date = as.Date(reference_date) + 7)
+  mutate(target_end_date = as.Date(reference_date) + 7) |> 
+  mutate(reference_date = as.Date(reference_date))
 
 alloscore_models <- unique(alloscore_data_summaries1$model)
 score_data_summaries1 <- score_data1 |>
@@ -434,8 +849,7 @@ score_data_summaries1 <- score_data1 |>
   mutate(target_end_date = as.Date(reference_date) + 7)
 
 all_scores1_100 <- left_join(alloscore_data_summaries1, score_data_summaries1,
-                      by=c("model", "target_end_date")) %>%
-  filter(reference_date.x=="2020-11-21")
+                      by=c("model", "target_end_date", "reference_date")) 
 
 # 2 week
 tar_load("Kat100k_alloscores2")
@@ -457,7 +871,8 @@ alloscore_data_summaries2 <- Kat100k_alloscores2 |>
          allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
   ungroup() |>
   complete(model, reference_date) |>
-  mutate(target_end_date = as.Date(reference_date) + 14)
+  mutate(target_end_date = as.Date(reference_date) + 14) |> 
+  mutate(reference_date = as.Date(reference_date))
 
 alloscore_models <- unique(alloscore_data_summaries2$model)
 score_data_summaries2 <- score_data2 |>
@@ -475,8 +890,7 @@ score_data_summaries2 <- score_data2 |>
   mutate(target_end_date = as.Date(reference_date) + 14)
 
 all_scores2_100 <- left_join(alloscore_data_summaries2, score_data_summaries2,
-                      by=c("model", "target_end_date"))%>%
-  filter(reference_date.x=="2020-11-21")
+                      by=c("model", "target_end_date", "reference_date"))
 
 # 3 week
 
@@ -499,7 +913,8 @@ alloscore_data_summaries3 <- Kat100k_alloscores3 |>
          allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
   ungroup() |>
   complete(model, reference_date) |>
-  mutate(target_end_date = as.Date(reference_date) + 21)
+  mutate(target_end_date = as.Date(reference_date) + 21) |> 
+  mutate(reference_date = as.Date(reference_date))
 
 alloscore_models <- unique(alloscore_data_summaries2$model)
 score_data_summaries3 <- score_data3 |>
@@ -517,8 +932,7 @@ score_data_summaries3 <- score_data3 |>
   mutate(target_end_date = as.Date(reference_date) + 21)
 
 all_scores3_100 <- left_join(alloscore_data_summaries3, score_data_summaries3,
-                      by=c("model", "target_end_date"))%>%
-  filter(reference_date.x=="2020-11-21")
+                      by=c("model", "target_end_date", "reference_date"))
 
 # 4 week
 
@@ -541,7 +955,8 @@ alloscore_data_summaries4 <- Kat100k_alloscores4 |>
          allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
   ungroup() |>
   complete(model, reference_date) |>
-  mutate(target_end_date = as.Date(reference_date) + 28)
+  mutate(target_end_date = as.Date(reference_date) + 28) |> 
+  mutate(reference_date = as.Date(reference_date))
 
 alloscore_models <- unique(alloscore_data_summaries2$model)
 score_data_summaries4 <- score_data4 |>
@@ -559,8 +974,28 @@ score_data_summaries4 <- score_data4 |>
   mutate(target_end_date = as.Date(reference_date) + 28)
 
 all_scores4_100 <- left_join(alloscore_data_summaries4, score_data_summaries4,
-                      by=c("model", "target_end_date"))%>%
-  filter(reference_date.x=="2020-11-21")
+                      by=c("model", "target_end_date", "reference_date"))
+
+```
+
+## October 31st, 2020 {.tabset}
+
+```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+dates100k <- c("2020-10-31")
+
+summary1_100 <- all_scores1_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary2_100 <- all_scores2_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary3_100 <- all_scores3_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary4_100 <- all_scores4_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
 
 ```
 
@@ -568,7 +1003,434 @@ all_scores4_100 <- left_join(alloscore_data_summaries4, score_data_summaries4,
 
 ```{r echo=FALSE}
 
-summary1_100 <- all_scores1_100 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+kable(summary1_100, caption = "2020-10-31: Model scoring for the 1 week horizon (2020-11-07). Allocations conducted with a resource constraint of 100,000 units.")  
+  
+```
+
+### 2 weeks
+
+```{r echo=FALSE}
+
+kable(summary2_100, caption = "2020-10-31: Model scoring for the 2 week horizon (2020-11-14). Allocations conducted with a resource constraint of 100,000 units.")
+
+```
+
+### 3 weeks
+
+```{r echo=FALSE}
+
+kable(summary3_100, caption = "2020-10-31: Model scoring for the 3 week horizon (2020-11-21). Allocations conducted with a resource constraint of 100,000 units.")
+
+```
+
+### 4 weeks
+
+```{r echo=FALSE}
+
+kable(summary4_100, caption = "2020-10-31: Model scoring for the 4 week horizon (2020-11-28). Allocations conducted with a resource constraint of 100,000 units.")
+
+```
+
+##  {.unnumbered}
+
+### Scores over time
+
+```{r echo=FALSE}
+
+summary1_100$horizon <- "1"
+summary2_100$horizon <- "2"
+summary3_100$horizon <- "3"
+summary4_100$horizon <- "4"
+
+summary_100 <- rbind(summary1_100, summary2_100, summary3_100, summary4_100)
+ggplot(data = summary_100, aes(x=horizon, y=alloscore, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  #scale_y_continuous(breaks = seq(1,7, by = 1)) + 
+  ggtitle("Alloscore by Time Horizon: October 31st, 2020", subtitle = "11/07, 11/14, 11/21, 11/28") +
+  xlab("Time Horizon (weeks)") + ylab("Alloscore") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+### Rankings over time {.tabset}
+
+#### Alloscore
+
+```{r echo=FALSE}
+
+ggplot(data = summary_100, aes(x=horizon, y=allo_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,11, by = 1)) +
+  ggtitle("Alloscore Rank by Time Horizon: October 31st, 2020", subtitle = "11/07, 11/14, 11/21, 11/28") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### WIS
+
+```{r echo=FALSE}
+
+ggplot(data = summary_100 %>% filter(model != "per-capita"), aes(x=horizon, y=mwis_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("MWIS Rank by Time Horizon: October 31st, 2020", subtitle = "11/07, 11/14, 11/21, 11/28") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### Kendall's Tau a
+
+##### 1 week
+
+```{r echo=FALSE}
+
+kendall_test1_100 <- cor.test(summary1_100$alloscore, summary1_100$mwis, method = "kendall")
+kendall_test1_100
+
+```
+
+##### 2 week
+
+```{r echo=FALSE}
+
+kendall_test2_100 <- cor.test(summary2_100$alloscore, summary2_100$mwis, method = "kendall")
+kendall_test2_100
+
+```
+
+##### 3 week
+
+```{r echo=FALSE}
+
+kendall_test3_100 <- cor.test(summary3_100$alloscore, summary3_100$mwis, method = "kendall")
+kendall_test3_100
+
+```
+
+##### 4 week
+
+```{r echo=FALSE}
+
+kendall_test4_100 <- cor.test(summary4_100$alloscore, summary4_100$mwis, method = "kendall")
+kendall_test4_100
+
+```
+## November 7th, 2020 {.tabset}
+
+```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+dates100k <- c("2020-11-07")
+
+summary1_100 <- all_scores1_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary2_100 <- all_scores2_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary3_100 <- all_scores3_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary4_100 <- all_scores4_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+
+```
+
+### 1 week
+
+```{r echo=FALSE}
+
+kable(summary1_100, caption = "2020-11-07: Model scoring for the 1 week horizon (2020-11-14). Allocations conducted with a resource constraint of 100,000 units.")  
+  
+```
+
+### 2 weeks
+
+```{r echo=FALSE}
+
+kable(summary2_100, caption = "2020-11-07: Model scoring for the 2 week horizon (2020-11-21). Allocations conducted with a resource constraint of 100,000 units.")
+
+```
+
+### 3 weeks
+
+```{r echo=FALSE}
+
+kable(summary3_100, caption = "2020-11-07: Model scoring for the 3 week horizon (2020-11-28). Allocations conducted with a resource constraint of 100,000 units.")
+
+```
+
+### 4 weeks
+
+```{r echo=FALSE}
+
+kable(summary4_100, caption = "2020-11-07: Model scoring for the 4 week horizon (2020-12-05). Allocations conducted with a resource constraint of 100,000 units.")
+
+```
+
+##  {.unnumbered}
+
+### Scores over time
+
+```{r echo=FALSE}
+
+summary1_100$horizon <- "1"
+summary2_100$horizon <- "2"
+summary3_100$horizon <- "3"
+summary4_100$horizon <- "4"
+
+summary_100 <- rbind(summary1_100, summary2_100, summary3_100, summary4_100)
+ggplot(data = summary_100, aes(x=horizon, y=alloscore, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  #scale_y_continuous(breaks = seq(1,7, by = 1)) + 
+  ggtitle("Alloscore by Time Horizon: November 7th, 2020", subtitle = "11/14, 11/21, 11/28, 12/05") +
+  xlab("Time Horizon (weeks)") + ylab("Alloscore") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+### Rankings over time {.tabset}
+
+#### Alloscore
+
+```{r echo=FALSE}
+
+ggplot(data = summary_100, aes(x=horizon, y=allo_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,11, by = 1)) +
+  ggtitle("Alloscore Rank by Time Horizon: November 7th, 2020", subtitle = "11/14, 11/21, 11/28, 12/05") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### WIS
+
+```{r echo=FALSE}
+
+ggplot(data = summary_100 %>% filter(model != "per-capita"), aes(x=horizon, y=mwis_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("MWIS Rank by Time Horizon: November 7th, 2020", subtitle = "11/14, 11/21, 11/28, 12/05") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### Kendall's Tau a
+
+##### 1 week
+
+```{r echo=FALSE}
+
+kendall_test1_100 <- cor.test(summary1_100$alloscore, summary1_100$mwis, method = "kendall")
+kendall_test1_100
+
+```
+
+##### 2 week
+
+```{r echo=FALSE}
+
+kendall_test2_100 <- cor.test(summary2_100$alloscore, summary2_100$mwis, method = "kendall")
+kendall_test2_100
+
+```
+
+##### 3 week
+
+```{r echo=FALSE}
+
+kendall_test3_100 <- cor.test(summary3_100$alloscore, summary3_100$mwis, method = "kendall")
+kendall_test3_100
+
+```
+
+##### 4 week
+
+```{r echo=FALSE}
+
+kendall_test4_100 <- cor.test(summary4_100$alloscore, summary4_100$mwis, method = "kendall")
+kendall_test4_100
+
+```
+
+## November 14th, 2020 {.tabset}
+
+```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+dates100k <- c("2020-11-14")
+
+summary1_100 <- all_scores1_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary2_100 <- all_scores2_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary3_100 <- all_scores3_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary4_100 <- all_scores4_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+
+```
+
+### 1 week
+
+```{r echo=FALSE}
+
+kable(summary1_100, caption = "2020-11-14: Model scoring for the 1 week horizon (2020-11-21). Allocations conducted with a resource constraint of 100,000 units.")  
+  
+```
+
+### 2 weeks
+
+```{r echo=FALSE}
+
+kable(summary2_100, caption = "2020-11-14: Model scoring for the 2 week horizon (2020-11-28). Allocations conducted with a resource constraint of 100,000 units.")
+
+```
+
+### 3 weeks
+
+```{r echo=FALSE}
+
+kable(summary3_100, caption = "2020-11-14: Model scoring for the 3 week horizon (2020-12-05). Allocations conducted with a resource constraint of 100,000 units.")
+
+```
+
+### 4 weeks
+
+```{r echo=FALSE}
+
+kable(summary4_100, caption = "2020-11-14: Model scoring for the 4 week horizon (2020-12-12). Allocations conducted with a resource constraint of 100,000 units.")
+
+```
+
+##  {.unnumbered}
+
+### Scores over time
+
+```{r echo=FALSE}
+
+summary1_100$horizon <- "1"
+summary2_100$horizon <- "2"
+summary3_100$horizon <- "3"
+summary4_100$horizon <- "4"
+
+summary_100 <- rbind(summary1_100, summary2_100, summary3_100, summary4_100)
+ggplot(data = summary_100, aes(x=horizon, y=alloscore, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  #scale_y_continuous(breaks = seq(1,7, by = 1)) + 
+  ggtitle("Alloscore by Time Horizon: November 14th, 2020", subtitle = "11/21, 11/28, 12/05, 12/12") +
+  xlab("Time Horizon (weeks)") + ylab("Alloscore") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+### Rankings over time {.tabset}
+
+#### Alloscore
+
+```{r echo=FALSE}
+
+ggplot(data = summary_100, aes(x=horizon, y=allo_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,11, by = 1)) +
+  ggtitle("Alloscore Rank by Time Horizon: November 14th, 2020", subtitle = "11/21, 11/28, 12/05, 12/12") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### WIS
+
+```{r echo=FALSE}
+
+ggplot(data = summary_100 %>% filter(model != "per-capita"), aes(x=horizon, y=mwis_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("MWIS Rank by Time Horizon: November 14th, 2020", subtitle = "11/21, 11/28, 12/05, 12/12") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### Kendall's Tau a
+
+##### 1 week
+
+```{r echo=FALSE}
+
+kendall_test1_100 <- cor.test(summary1_100$alloscore, summary1_100$mwis, method = "kendall")
+kendall_test1_100
+
+```
+
+##### 2 week
+
+```{r echo=FALSE}
+
+kendall_test2_100 <- cor.test(summary2_100$alloscore, summary2_100$mwis, method = "kendall")
+kendall_test2_100
+
+```
+
+##### 3 week
+
+```{r echo=FALSE}
+
+kendall_test3_100 <- cor.test(summary3_100$alloscore, summary3_100$mwis, method = "kendall")
+kendall_test3_100
+
+```
+
+##### 4 week
+
+```{r echo=FALSE}
+
+kendall_test4_100 <- cor.test(summary4_100$alloscore, summary4_100$mwis, method = "kendall")
+kendall_test4_100
+
+```
+
+## November 21st, 2020 {.tabset}
+
+```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+dates100k <- c("2020-11-21")
+
+summary1_100 <- all_scores1_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary2_100 <- all_scores2_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary3_100 <- all_scores3_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary4_100 <- all_scores4_100 %>%
+  filter(reference_date %in% dates100k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+
+```
+
+### 1 week
+
+```{r echo=FALSE}
+
 kable(summary1_100, caption = "2020-11-21: Model scoring for the 1 week horizon (2020-11-28). Allocations conducted with a resource constraint of 100,000 units.")  
   
 ```
@@ -576,35 +1438,131 @@ kable(summary1_100, caption = "2020-11-21: Model scoring for the 1 week horizon 
 ### 2 weeks
 
 ```{r echo=FALSE}
-summary2_100 <- all_scores2_100 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+
 kable(summary2_100, caption = "2020-11-21: Model scoring for the 2 week horizon (2020-12-05). Allocations conducted with a resource constraint of 100,000 units.")
+
 ```
 
 ### 3 weeks
 
 ```{r echo=FALSE}
-summary3_100 <- all_scores3_100 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+
 kable(summary3_100, caption = "2020-11-21: Model scoring for the 3 week horizon (2020-12-12). Allocations conducted with a resource constraint of 100,000 units.")
+
 ```
 
 ### 4 weeks
 
 ```{r echo=FALSE}
-summary4_100 <- all_scores4_100 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+
 kable(summary4_100, caption = "2020-11-21: Model scoring for the 4 week horizon (2020-12-19). Allocations conducted with a resource constraint of 100,000 units.")
+
 ```
 
-## December 18th, 2021 {.tabset}
+##  {.unnumbered}
+
+### Scores over time
+
+```{r echo=FALSE}
+
+summary1_100$horizon <- "1"
+summary2_100$horizon <- "2"
+summary3_100$horizon <- "3"
+summary4_100$horizon <- "4"
+
+summary_100 <- rbind(summary1_100, summary2_100, summary3_100, summary4_100)
+ggplot(data = summary_100, aes(x=horizon, y=alloscore, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  #scale_y_continuous(breaks = seq(1,7, by = 1)) + 
+  ggtitle("Alloscore by Time Horizon: November 21st, 2020", subtitle = "11/28, 12/05, 12/12, 12/19") +
+  xlab("Time Horizon (weeks)") + ylab("Alloscore") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+### Rankings over time {.tabset}
+
+#### Alloscore
+
+```{r echo=FALSE}
+
+ggplot(data = summary_100, aes(x=horizon, y=allo_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,11, by = 1)) +
+  ggtitle("Alloscore Rank by Time Horizon: November 21st, 2020", subtitle = "11/28, 12/05, 12/12, 12/19") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### WIS
+
+```{r echo=FALSE}
+
+ggplot(data = summary_100 %>% filter(model != "per-capita"), aes(x=horizon, y=mwis_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("MWIS Rank by Time Horizon: November 21st, 2020", subtitle = "11/28, 12/05, 12/12, 12/19") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### Kendall's Tau a
+
+##### 1 week
+
+```{r echo=FALSE}
+
+kendall_test1_100 <- cor.test(summary1_100$alloscore, summary1_100$mwis, method = "kendall")
+kendall_test1_100
+
+```
+
+##### 2 week
+
+```{r echo=FALSE}
+
+kendall_test2_100 <- cor.test(summary2_100$alloscore, summary2_100$mwis, method = "kendall")
+kendall_test2_100
+
+```
+
+##### 3 week
+
+```{r echo=FALSE}
+
+kendall_test3_100 <- cor.test(summary3_100$alloscore, summary3_100$mwis, method = "kendall")
+kendall_test3_100
+
+```
+
+##### 4 week
+
+```{r echo=FALSE}
+
+kendall_test4_100 <- cor.test(summary4_100$alloscore, summary4_100$mwis, method = "kendall")
+kendall_test4_100
+
+```
+
+
+## December 11th, 2021 {.tabset}
 
 ```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+# Data Prep 
+
 # 1 week
-tar_load("Kat400k_alloscores1")
-tar_load("percap1_400")
+tar_load("Kat200k_alloscores1")
+tar_load("percap1_200")
 tar_load("score_data1")
+Kat200k_alloscores1 <- bind_rows(Kat200k_alloscores1, percap1_200 |> filter(`K` == 200000))
 
-Kat400k_alloscores1 <- bind_rows(Kat400k_alloscores1, percap1_400 |> filter(`K` == 400000))
-
-alloscore_data_summaries1 <- Kat400k_alloscores1 |>
+alloscore_data_summaries1 <- Kat200k_alloscores1 |>
   group_by(model, reference_date) |>
   mutate(components = case_when(              # This line gets rid of negatives by turning
     components <= 0 ~ abs(`components`),      # neg values (undershoots) to absolute value
@@ -617,7 +1575,8 @@ alloscore_data_summaries1 <- Kat400k_alloscores1 |>
          allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
   ungroup() |>
   complete(model, reference_date) |>
-  mutate(target_end_date = as.Date(reference_date) + 7)
+  mutate(target_end_date = as.Date(reference_date) + 7) |> 
+  mutate(reference_date = as.Date(reference_date))
 
 alloscore_models <- unique(alloscore_data_summaries1$model)
 score_data_summaries1 <- score_data1 |>
@@ -634,18 +1593,17 @@ score_data_summaries1 <- score_data1 |>
   complete(model, reference_date) |>
   mutate(target_end_date = as.Date(reference_date) + 7)
 
-all_scores1_400 <- left_join(alloscore_data_summaries1, score_data_summaries1,
-                      by=c("model", "target_end_date")) %>%
-  filter(reference_date.x=="2021-12-25")
+all_scores1_200 <- left_join(alloscore_data_summaries1, score_data_summaries1,
+                      by=c("model", "target_end_date", "reference_date")) 
 
 # 2 week
-tar_load("Kat400k_alloscores2")
-tar_load("percap2_400")
+tar_load("Kat200k_alloscores2")
+tar_load("percap2_200")
 tar_load("score_data2")
 
-Kat400k_alloscores2 <- bind_rows(Kat400k_alloscores2, percap2_400 |> filter(`K` == 400000))
+Kat200k_alloscores2 <- bind_rows(Kat200k_alloscores2, percap2_200 |> filter(`K` == 200000))
 
-alloscore_data_summaries2 <- Kat400k_alloscores2 |>
+alloscore_data_summaries2 <- Kat200k_alloscores2 |>
   group_by(model, reference_date) |>
   mutate(components = case_when(              # This line gets rid of negatives by turning
     components <= 0 ~ abs(`components`),      # neg values (undershoots) to absolute value
@@ -658,7 +1616,8 @@ alloscore_data_summaries2 <- Kat400k_alloscores2 |>
          allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
   ungroup() |>
   complete(model, reference_date) |>
-  mutate(target_end_date = as.Date(reference_date) + 14)
+  mutate(target_end_date = as.Date(reference_date) + 14) |> 
+  mutate(reference_date = as.Date(reference_date))
 
 alloscore_models <- unique(alloscore_data_summaries2$model)
 score_data_summaries2 <- score_data2 |>
@@ -675,19 +1634,18 @@ score_data_summaries2 <- score_data2 |>
   complete(model, reference_date) |>
   mutate(target_end_date = as.Date(reference_date) + 14)
 
-all_scores2_400 <- left_join(alloscore_data_summaries2, score_data_summaries2,
-                      by=c("model", "target_end_date"))%>%
-  filter(reference_date.x=="2022-01-01")
+all_scores2_200 <- left_join(alloscore_data_summaries2, score_data_summaries2,
+                      by=c("model", "target_end_date", "reference_date"))
 
 # 3 week
 
-tar_load("Kat400k_alloscores3")
-tar_load("percap3_400")
+tar_load("Kat200k_alloscores3")
+tar_load("percap3_200")
 tar_load("score_data3")
 
-Kat400k_alloscores3 <- bind_rows(Kat400k_alloscores3, percap3_400 |> filter(`K` == 400000))
+Kat200k_alloscores3 <- bind_rows(Kat200k_alloscores3, percap3_200 |> filter(`K` == 200000))
 
-alloscore_data_summaries3 <- Kat400k_alloscores3 |>
+alloscore_data_summaries3 <- Kat200k_alloscores3 |>
   group_by(model, reference_date) |>
   mutate(components = case_when(              # This line gets rid of negatives by turning
     components <= 0 ~ abs(`components`),      # neg values (undershoots) to absolute value
@@ -700,7 +1658,8 @@ alloscore_data_summaries3 <- Kat400k_alloscores3 |>
          allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
   ungroup() |>
   complete(model, reference_date) |>
-  mutate(target_end_date = as.Date(reference_date) + 21)
+  mutate(target_end_date = as.Date(reference_date) + 21) |> 
+  mutate(reference_date = as.Date(reference_date))
 
 alloscore_models <- unique(alloscore_data_summaries2$model)
 score_data_summaries3 <- score_data3 |>
@@ -717,19 +1676,18 @@ score_data_summaries3 <- score_data3 |>
   complete(model, reference_date) |>
   mutate(target_end_date = as.Date(reference_date) + 21)
 
-all_scores3_400 <- left_join(alloscore_data_summaries3, score_data_summaries3,
-                      by=c("model", "target_end_date"))%>%
-  filter(reference_date.x=="2022-01-08")
+all_scores3_200 <- left_join(alloscore_data_summaries3, score_data_summaries3,
+                      by=c("model", "target_end_date", "reference_date"))
 
 # 4 week
 
-tar_load("Kat400k_alloscores4")
-tar_load("percap4_400")
+tar_load("Kat200k_alloscores4")
+tar_load("percap4_200")
 tar_load("score_data4")
 
-Kat400k_alloscores4 <- bind_rows(Kat400k_alloscores4, percap3_400 |> filter(`K` == 400000))
+Kat200k_alloscores4 <- bind_rows(Kat200k_alloscores4, percap3_200 |> filter(`K` == 200000))
 
-alloscore_data_summaries4 <- Kat400k_alloscores4 |>
+alloscore_data_summaries4 <- Kat200k_alloscores4 |>
   group_by(model, reference_date) |>
   mutate(components = case_when(              # This line gets rid of negatives by turning
     components <= 0 ~ abs(`components`),      # neg values (undershoots) to absolute value
@@ -742,7 +1700,8 @@ alloscore_data_summaries4 <- Kat400k_alloscores4 |>
          allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
   ungroup() |>
   complete(model, reference_date) |>
-  mutate(target_end_date = as.Date(reference_date) + 28)
+  mutate(target_end_date = as.Date(reference_date) + 28) |> 
+  mutate(reference_date = as.Date(reference_date))
 
 alloscore_models <- unique(alloscore_data_summaries2$model)
 score_data_summaries4 <- score_data4 |>
@@ -759,9 +1718,27 @@ score_data_summaries4 <- score_data4 |>
   complete(model, reference_date) |>
   mutate(target_end_date = as.Date(reference_date) + 28)
 
-all_scores4_400 <- left_join(alloscore_data_summaries4, score_data_summaries4,
-                      by=c("model", "target_end_date"))%>%
-  filter(reference_date.x=="2022-01-15")
+all_scores4_200 <- left_join(alloscore_data_summaries4, score_data_summaries4,
+                      by=c("model", "target_end_date", "reference_date"))
+
+```
+
+```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+dates200k <- c("2021-12-11")
+
+summary1_200 <- all_scores1_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary2_200 <- all_scores2_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary3_200 <- all_scores3_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary4_200 <- all_scores4_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
 
 ```
 
@@ -769,8 +1746,7 @@ all_scores4_400 <- left_join(alloscore_data_summaries4, score_data_summaries4,
 
 ```{r echo=FALSE}
 
-summary1_400 <- all_scores1_400 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
-kable(summary1_400, caption = "2021-12-18: Model scoring for the 1 week horizon (2021-12-25). Allocations conducted with a resource constraint of 400,000 units.")  
+kable(summary1_200, caption = "2021-12-11: Model scoring for the 1 week horizon (2021-12-18). Allocations conducted with a resource constraint of 200,000 units.")  
   
 ```
 
@@ -778,8 +1754,7 @@ kable(summary1_400, caption = "2021-12-18: Model scoring for the 1 week horizon 
 
 ```{r echo=FALSE}
 
-summary2_400 <- all_scores2_400 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
-kable(summary2_400, caption = "2021-12-18: Model scoring for the 2 week horizon (2022-01-01). Allocations conducted with a resource constraint of 400,000 units.")  
+kable(summary2_200, caption = "2021-12-11: Model scoring for the 2 week horizon (2021-12-25). Allocations conducted with a resource constraint of 200,000 units.")  
   
 ```
 
@@ -787,8 +1762,7 @@ kable(summary2_400, caption = "2021-12-18: Model scoring for the 2 week horizon 
 
 ```{r echo=FALSE}
 
-summary3_400 <- all_scores3_400 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
-kable(summary3_400, caption = "2021-12-18: Model scoring for the 3 week horizon (2022-01-08). Allocations conducted with a resource constraint of 400,000 units.")  
+kable(summary3_200, caption = "2021-12-11: Model scoring for the 3 week horizon (2022-01-01). Allocations conducted with a resource constraint of 200,000 units.")  
   
 ```
 
@@ -796,9 +1770,538 @@ kable(summary3_400, caption = "2021-12-18: Model scoring for the 3 week horizon 
 
 ```{r echo=FALSE}
 
-summary4_400 <- all_scores4_400 %>% select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
-kable(summary4_400, caption = "2021-12-18: Model scoring for the 4 week horizon (2022-01-15). Allocations conducted with a resource constraint of 400,000 units.")  
+kable(summary4_200, caption = "2021-12-11: Model scoring for the 4 week horizon (2022-01-08). Allocations conducted with a resource constraint of 200,000 units.")  
   
 ```
 
+##  {.unnumbered}
+
+### Scores over time
+
+```{r echo=FALSE}
+
+summary1_200$horizon <- "1"
+summary2_200$horizon <- "2"
+summary3_200$horizon <- "3"
+summary4_200$horizon <- "4"
+summary_200 <- rbind(summary1_200, summary2_200, summary3_200, summary4_200)
+
+ggplot(data = summary_200, aes(x=horizon, y=alloscore, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  ggtitle("Alloscore by Time Horizon: December 11th, 2021", subtitle = "12/18, 12/25, 01/01, 01/08") +
+  xlab("Time Horizon (weeks)") + ylab("Alloscore") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+### Rankings over time {.tabset}
+
+#### Alloscore
+
+```{r echo=FALSE}
+
+ggplot(data = summary_200, aes(x=horizon, y=allo_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("Alloscore Rank by Time Horizon: December 11th, 2021", subtitle = "12/18, 12/25, 01/01, 01/08") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### WIS
+
+```{r echo=FALSE}
+
+ggplot(data = summary_200 %>% filter(model != "per-capita"), aes(x=horizon, y=mwis_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("MWIS Rank by Time Horizon: December 11th, 2021", subtitle = "12/18, 12/25, 01/01, 01/08") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### Kendall's Tau a
+
+##### 1 week
+
+```{r echo=FALSE}
+
+kendall_test1_200 <- cor.test(summary1_200$alloscore, summary1_200$mwis, method = "kendall")
+kendall_test1_200
+
+```
+
+##### 2 week
+
+```{r echo=FALSE}
+
+kendall_test2_200 <- cor.test(summary2_200$alloscore, summary2_200$mwis, method = "kendall")
+kendall_test2_200
+
+```
+
+##### 3 week
+
+```{r echo=FALSE}
+
+kendall_test3_200 <- cor.test(summary3_200$alloscore, summary3_200$mwis, method = "kendall")
+kendall_test3_200
+
+```
+
+##### 4 week
+
+```{r echo=FALSE}
+
+kendall_test4_200 <- cor.test(summary4_200$alloscore, summary4_200$mwis, method = "kendall")
+kendall_test4_200
+
+```
+
+
+## December 18th, 2021 {.tabset}
+
+```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+dates200k <- c("2021-12-18")
+
+summary1_200 <- all_scores1_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary2_200 <- all_scores2_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary3_200 <- all_scores3_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary4_200 <- all_scores4_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+
+```
+
+### 1 week
+
+```{r echo=FALSE}
+
+kable(summary1_200, caption = "2021-12-18: Model scoring for the 1 week horizon (2021-12-25). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+### 2 weeks
+
+```{r echo=FALSE}
+
+kable(summary2_200, caption = "2021-12-18: Model scoring for the 2 week horizon (2022-01-01). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+### 3 weeks
+
+```{r echo=FALSE}
+
+kable(summary3_200, caption = "2021-12-18: Model scoring for the 3 week horizon (2022-01-01). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+### 4 weeks
+
+```{r echo=FALSE}
+
+kable(summary4_200, caption = "2021-12-18: Model scoring for the 4 week horizon (2022-01-15). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+##  {.unnumbered}
+
+### Scores over time
+
+```{r echo=FALSE}
+
+summary1_200$horizon <- "1"
+summary2_200$horizon <- "2"
+summary3_200$horizon <- "3"
+summary4_200$horizon <- "4"
+summary_200 <- rbind(summary1_200, summary2_200, summary3_200, summary4_200)
+
+ggplot(data = summary_200, aes(x=horizon, y=alloscore, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  ggtitle("Alloscore by Time Horizon: December 18th, 2021", subtitle = "12/25, 01/01, 01/08, 01/15") +
+  xlab("Time Horizon (weeks)") + ylab("Alloscore") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+### Rankings over time {.tabset}
+
+#### Alloscore
+
+```{r echo=FALSE}
+
+ggplot(data = summary_200, aes(x=horizon, y=allo_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("Alloscore Rank by Time Horizon: December 18th, 2021", subtitle = "12/25, 01/01, 01/08, 01/15") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### WIS
+
+```{r echo=FALSE}
+
+ggplot(data = summary_200 %>% filter(model != "per-capita"), aes(x=horizon, y=mwis_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("MWIS Rank by Time Horizon: December 18th, 2021", subtitle = "12/25, 01/01, 01/08, 01/15") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### Kendall's Tau a
+
+##### 1 week
+
+```{r echo=FALSE}
+
+kendall_test1_200 <- cor.test(summary1_200$alloscore, summary1_200$mwis, method = "kendall")
+kendall_test1_200
+
+```
+
+##### 2 week
+
+```{r echo=FALSE}
+
+kendall_test2_200 <- cor.test(summary2_200$alloscore, summary2_200$mwis, method = "kendall")
+kendall_test2_200
+
+```
+
+##### 3 week
+
+```{r echo=FALSE}
+
+kendall_test3_200 <- cor.test(summary3_200$alloscore, summary3_200$mwis, method = "kendall")
+kendall_test3_200
+
+```
+
+##### 4 week
+
+```{r echo=FALSE}
+
+kendall_test4_200 <- cor.test(summary4_200$alloscore, summary4_200$mwis, method = "kendall")
+kendall_test4_200
+
+```
+
+
+## December 25th, 2021 {.tabset}
+
+```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+dates200k <- c("2021-12-25")
+
+summary1_200 <- all_scores1_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary2_200 <- all_scores2_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary3_200 <- all_scores3_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary4_200 <- all_scores4_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+
+```
+
+### 1 week
+
+```{r echo=FALSE}
+
+kable(summary1_200, caption = "2021-12-25: Model scoring for the 1 week horizon (2022-01-01). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+### 2 weeks
+
+```{r echo=FALSE}
+
+kable(summary2_200, caption = "2021-12-25: Model scoring for the 2 week horizon (2022-01-08). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+### 3 weeks
+
+```{r echo=FALSE}
+
+kable(summary3_200, caption = "2021-12-25: Model scoring for the 3 week horizon (2022-01-15). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+### 4 weeks
+
+```{r echo=FALSE}
+
+kable(summary4_200, caption = "2021-12-25: Model scoring for the 4 week horizon (2022-01-22). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+##  {.unnumbered}
+
+### Scores over time
+
+```{r echo=FALSE}
+
+summary1_200$horizon <- "1"
+summary2_200$horizon <- "2"
+summary3_200$horizon <- "3"
+summary4_200$horizon <- "4"
+summary_200 <- rbind(summary1_200, summary2_200, summary3_200, summary4_200)
+
+ggplot(data = summary_200, aes(x=horizon, y=alloscore, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  ggtitle("Alloscore by Time Horizon: December 25th, 2021", subtitle = "01/01, 01/08, 01/15, 01/22") +
+  xlab("Time Horizon (weeks)") + ylab("Alloscore") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+### Rankings over time {.tabset}
+
+#### Alloscore
+
+```{r echo=FALSE}
+
+ggplot(data = summary_200, aes(x=horizon, y=allo_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("Alloscore Rank by Time Horizon: December 25th, 2021", subtitle = "01/01, 01/08, 01/15, 01/22") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### WIS
+
+```{r echo=FALSE}
+
+ggplot(data = summary_200 %>% filter(model != "per-capita"), aes(x=horizon, y=mwis_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("MWIS Rank by Time Horizon: December 25th, 2021", subtitle = "01/01, 01/08, 01/15, 01/22") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### Kendall's Tau a
+
+##### 1 week
+
+```{r echo=FALSE}
+
+kendall_test1_200 <- cor.test(summary1_200$alloscore, summary1_200$mwis, method = "kendall")
+kendall_test1_200
+
+```
+
+##### 2 week
+
+```{r echo=FALSE}
+
+kendall_test2_200 <- cor.test(summary2_200$alloscore, summary2_200$mwis, method = "kendall")
+kendall_test2_200
+
+```
+
+##### 3 week
+
+```{r echo=FALSE}
+
+kendall_test3_200 <- cor.test(summary3_200$alloscore, summary3_200$mwis, method = "kendall")
+kendall_test3_200
+
+```
+
+##### 4 week
+
+```{r echo=FALSE}
+
+kendall_test4_200 <- cor.test(summary4_200$alloscore, summary4_200$mwis, method = "kendall")
+kendall_test4_200
+
+```
+
+
+## January 1st, 2022 {.tabset}
+
+```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
+
+dates200k <- c("2022-01-01")
+
+summary1_200 <- all_scores1_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary2_200 <- all_scores2_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary3_200 <- all_scores3_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+summary4_200 <- all_scores4_200 %>%
+  filter(reference_date %in% dates200k) %>% 
+  select(model, alloscore, allo_rank, mwis, mwis_rank) %>% drop_na(alloscore) %>% arrange(allo_rank)
+
+```
+
+### 1 week
+
+```{r echo=FALSE}
+
+kable(summary1_200, caption = "2022-01-01: Model scoring for the 1 week horizon (2022-01-08). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+### 2 weeks
+
+```{r echo=FALSE}
+
+kable(summary2_200, caption = "2022-01-01: Model scoring for the 2 week horizon (2022-01-15). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+### 3 weeks
+
+```{r echo=FALSE}
+
+kable(summary3_200, caption = "2022-01-01: Model scoring for the 3 week horizon (2022-01-22). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+### 4 weeks
+
+```{r echo=FALSE}
+
+kable(summary4_200, caption = "2022-01-01: Model scoring for the 4 week horizon (2022-01-29). Allocations conducted with a resource constraint of 200,000 units.")  
+  
+```
+
+##  {.unnumbered}
+
+### Scores over time
+
+```{r echo=FALSE}
+
+summary1_200$horizon <- "1"
+summary2_200$horizon <- "2"
+summary3_200$horizon <- "3"
+summary4_200$horizon <- "4"
+summary_200 <- rbind(summary1_200, summary2_200, summary3_200, summary4_200)
+
+ggplot(data = summary_200, aes(x=horizon, y=alloscore, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  ggtitle("Alloscore by Time Horizon: January 1st, 2022", subtitle = "01/08, 01/15, 01/22, 01/29") +
+  xlab("Time Horizon (weeks)") + ylab("Alloscore") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+### Rankings over time {.tabset}
+
+#### Alloscore
+
+```{r echo=FALSE}
+
+ggplot(data = summary_200, aes(x=horizon, y=allo_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("Alloscore Rank by Time Horizon: January 1st, 2022", subtitle = "01/08, 01/15, 01/22, 01/29") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### WIS
+
+```{r echo=FALSE}
+
+ggplot(data = summary_200 %>% filter(model != "per-capita"), aes(x=horizon, y=mwis_rank, color = model, group=model)) + 
+  geom_point() + geom_line() + theme_bw() + 
+  scale_y_reverse(breaks = seq(1,7, by = 1)) +
+  ggtitle("MWIS Rank by Time Horizon: January 1st, 2022", subtitle = "01/08, 01/15, 01/22, 01/29") +
+  xlab("Time Horizon (weeks)") + ylab("Ranking") + 
+  labs(color = "Model") +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+#### Kendall's Tau a
+
+##### 1 week
+
+```{r echo=TRUE}
+
+# kendall_test1_200 <- cor.test(summary1_200$alloscore, summary1_200$mwis, method = "kendall")
+# kendall_test1_200
+
+```
+
+##### 2 week
+
+```{r echo=TRUE}
+
+# kendall_test2_200 <- cor.test(summary2_200$alloscore, summary2_200$mwis, method = "kendall")
+# kendall_test2_200
+
+```
+
+##### 3 week
+
+```{r echo=TRUE}
+
+# kendall_test3_200 <- cor.test(summary3_200$alloscore, summary3_200$mwis, method = "kendall")
+# kendall_test3_200
+
+```
+
+##### 4 week
+
+```{r echo=TRUE}
+
+# kendall_test4_200 <- cor.test(summary4_200$alloscore, summary4_200$mwis, method = "kendall")
+# kendall_test4_200
+
+```
+# Integrated Allocation Score?
+
 # Insights
+
+## Scoring:
+
+-   As can be expected, for weeks of lower resource constraint, alloscores were found to be low or even 0 (ex. week of 12/25/2021 for FAIR_NRAR).
+-   As need climbed and resources came to exceed supply, more underallocation was observed in both instances - however, when need climbed a lot due to spikes in cases, alloscores did not continue to climb, but rather leveled or even decreased as much of that loss was deemed unavoidable.
+
+## Model performance:
+
+-   The per-capita allocation score, which served as a control allocation method, was expected to rise in rankings as time horizon increased (the models would perform worse the further out they predicted, so an allocation method naive to current disease levels would fare better, relatively. It's unclear if this was the case.
+
+-   Rankings with mWIS and rankings with allocation score were assessed by Kendall's Tau for whether rankings correlated with each other. None of these tests found a significant positive or negative association, though the found correlation coefficient was always negative - possibly indicating that better mWIS models tend to have a better allocation score and vice versa.

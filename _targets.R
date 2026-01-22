@@ -35,7 +35,7 @@ tar_source(files = c("R/data-ingestion.R",
                      "R/percap.R",
                      "R/plot_functions.R"))
 
-values <- tibble(forecast_dates = c(as.character(seq.Date(as.Date("2020-11-21"), as.Date("2020-12-19"), by = "7 days")), as.character(seq.Date(as.Date("2021-12-25"), as.Date("2022-01-22"), by = "7 days"))))
+values <- tibble(forecast_dates = c(as.character(seq.Date(as.Date("2020-10-31"), as.Date("2020-11-21"), by = "7 days")), as.character(seq.Date(as.Date("2021-12-11"), as.Date("2022-01-01"), by = "7 days"))))
 timehorizon1 <- 1
 timehorizon2 <- 2
 timehorizon3 <- 3
@@ -100,57 +100,57 @@ setup <- list(
    name = Kat100k_alloscores1,
    command = print(run_and_assemble_alloscores(forecast_data1,
                                          truth_data,
-                                         reference_dates = values$forecast_dates[1:9], #it's erroring on 10th date - not sure why
+                                         reference_dates = values$forecast_dates[1:4], 
                                          one_K = 100000))
  ),
  tar_target(
    name = Kat100k_alloscores2,
    command = print(run_and_assemble_alloscores(forecast_data2,
                                          truth_data,
-                                         reference_dates = values$forecast_dates[1:9],
+                                         reference_dates = values$forecast_dates[1:4],
                                          one_K = 100000))
  ),
    tar_target(
      name = Kat100k_alloscores3,
      command = print(run_and_assemble_alloscores(forecast_data3,
                                            truth_data,
-                                           reference_dates = values$forecast_dates[1:9],
+                                           reference_dates = values$forecast_dates[1:4],
                                            one_K = 100000))
    ),
      tar_target(
        name = Kat100k_alloscores4,
        command = print(run_and_assemble_alloscores(forecast_data4,
                                              truth_data,
-                                             reference_dates = values$forecast_dates[1:9],
+                                             reference_dates = values$forecast_dates[1:4],
                                              one_K = 100000))
      ),
  tar_target(
-   name = Kat400k_alloscores1,
+   name = Kat200k_alloscores1,
    command = print(run_and_assemble_alloscores(forecast_data1,
                                                truth_data,
-                                               reference_dates = values$forecast_dates[1:9], #it's erroring on 10th date - not sure why
-                                               one_K = 400000))
+                                               reference_dates = values$forecast_dates[5:8], 
+                                               one_K = 200000))
  ),
  tar_target(
-   name = Kat400k_alloscores2,
+   name = Kat200k_alloscores2,
    command = print(run_and_assemble_alloscores(forecast_data2,
                                                truth_data,
-                                               reference_dates = values$forecast_dates[1:9],
-                                               one_K = 400000))
+                                               reference_dates = values$forecast_dates[5:8],
+                                               one_K = 200000))
  ),
  tar_target(
-   name = Kat400k_alloscores3,
+   name = Kat200k_alloscores3,
    command = print(run_and_assemble_alloscores(forecast_data3,
                                                truth_data,
-                                               reference_dates = values$forecast_dates[1:9],
-                                               one_K = 400000))
+                                               reference_dates = values$forecast_dates[5:8],
+                                               one_K = 200000))
  ),
  tar_target(
-   name = Kat400k_alloscores4,
+   name = Kat200k_alloscores4,
    command = print(run_and_assemble_alloscores(forecast_data4,
                                                truth_data,
-                                               reference_dates = values$forecast_dates[1:9],
-                                               one_K = 400000))
+                                               reference_dates = values$forecast_dates[5:8],
+                                               one_K = 200000))
  ),
  tar_target(
    name = pops22,
@@ -240,24 +240,24 @@ combined4 <- tar_combine(
    name = percap4_100,
    command = score_per_capita_allocation(dat = Kat100k_alloscores4, pops = pops22)
  )
- make_percap1_400 <- tar_target(
-   name = percap1_400,
-   command = score_per_capita_allocation(dat = Kat400k_alloscores1, pops = pops22)
+ make_percap1_200 <- tar_target(
+   name = percap1_200,
+   command = score_per_capita_allocation(dat = Kat200k_alloscores1, pops = pops22)
  )
- make_percap2_400 <- tar_target(
-   name = percap2_400,
-   command = score_per_capita_allocation(dat = Kat400k_alloscores2, pops = pops22)
+ make_percap2_200 <- tar_target(
+   name = percap2_200,
+   command = score_per_capita_allocation(dat = Kat200k_alloscores2, pops = pops22)
  )
- make_percap3_400 <- tar_target(
-   name = percap3_400,
-   command = score_per_capita_allocation(dat = Kat400k_alloscores3, pops = pops22)
+ make_percap3_200 <- tar_target(
+   name = percap3_200,
+   command = score_per_capita_allocation(dat = Kat200k_alloscores3, pops = pops22)
  )
- make_percap4_400 <- tar_target(
-   name = percap4_400,
-   command = score_per_capita_allocation(dat = Kat400k_alloscores4, pops = pops22)
+ make_percap4_200 <- tar_target(
+   name = percap4_200,
+   command = score_per_capita_allocation(dat = Kat200k_alloscores4, pops = pops22)
  )
 
-list(setup, mapped1, mapped2, mapped3, mapped4, combined1, combined2, combined3, combined4, make_percap1_100, make_percap2_100, make_percap3_100, make_percap4_100, make_percap1_400, make_percap2_400, make_percap3_400, make_percap4_400)
+list(setup, mapped1, mapped2, mapped3, mapped4, combined1, combined2, combined3, combined4, make_percap1_100, make_percap2_100, make_percap3_100, make_percap4_100, make_percap1_200, make_percap2_200, make_percap3_200, make_percap4_200)
 
 
 
