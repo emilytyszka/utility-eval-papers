@@ -16,7 +16,7 @@ conflicts_prefer(stats::lag)
 
 # Set target options:
 tar_option_set(
-  controller = crew_controller_local(workers = 2),
+  controller = crew_controller_local(workers = 1),
   packages = c("tidyverse", "covidHubUtils", "distfromq", "alloscore", "gh"), # packages that your targets need to run
   imports = c("alloscore"),
   format = "rds" # default storage format
@@ -35,7 +35,7 @@ tar_source(files = c("R/data-ingestion.R",
                      "R/percap.R",
                      "R/plot_functions.R"))
 
-values <- tibble(forecast_dates = as.character(seq.Date(as.Date("2021-12-11"), as.Date("2022-01-01"), by = "7 days")))
+values <- tibble(forecast_dates = as.character(c(as.Date("2021-12-11"), as.Date("2022-01-01"), by = "7 days")))
 timehorizon1 <- 1
 timehorizon3 <- 3
 
@@ -57,8 +57,7 @@ setup <- list(
   tar_target(
     name = forecast_data1,
     command = get_forecast_data(values$forecast_dates, models = eligible_models, 
-                                locations = reqd_locs, timehorizon=timehorizon1, 
-                                date_of_interest = "2022-01-01")
+                                locations = reqd_locs, timehorizon=timehorizon1)
   ),
   # tar_target(
   #   name = forecast_data2,
@@ -67,8 +66,7 @@ setup <- list(
   tar_target(
     name = forecast_data3,
     command = get_forecast_data(values$forecast_dates, models = eligible_models, 
-                                locations = reqd_locs, timehorizon=timehorizon3, 
-                                date_of_interest = "2022-01-01")
+                                locations = reqd_locs, timehorizon=timehorizon3)
   ),
    tar_target(
      name = truth_data,
@@ -86,14 +84,14 @@ setup <- list(
    name = Kat200k_alloscores1,
    command = print(run_and_assemble_alloscores(forecast_data1,
                                                truth_data,
-                                               reference_dates = values$forecast_dates,
+                                               reference_dates = unique(forecast_data1$reference_date),
                                                one_K = 200000))
  ),
  tar_target(
    name = Kat200k_alloscores3,
    command = print(run_and_assemble_alloscores(forecast_data3,
                                                truth_data,
-                                               reference_dates = values$forecast_dates,
+                                               reference_dates = unique(forecast_data3$reference_date),
                                                one_K = 200000))
  ),
  tar_target(

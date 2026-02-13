@@ -1,6 +1,6 @@
 models_to_include <- c("CEID-Walk", "COVIDhub-4_week_ensemble", "COVIDhub-baseline", "CU-select", "FAIR-NRAR",  "IowaStateLW-STEM", "JHU_IDD-CovidSP", "JHUAPL-Bucky", "LANL-GrowthRate", "LNQ-ens1", "OneQuietNight-ML", "UChicagoCHATTOPADHYAY-UnIT")  
 
-get_forecast_data <- function(forecast_dates, models, locations, timehorizon, date_of_interest = forecast_dates){
+get_forecast_data <- function(forecast_dates, models, locations, timehorizon){
   require(covidHubUtils)
   load_forecasts(
     dates = forecast_dates,
@@ -14,8 +14,7 @@ get_forecast_data <- function(forecast_dates, models, locations, timehorizon, da
     as_of = NULL,
     hub = c("US")) |>
     align_forecasts() |>
-    dplyr::filter(horizon == timehorizon) |> # use "horizon" for JHU data. >1 horizon creates alloscore() merge errors
-    dplyr::filter(target_end_date == date_of_interest) # adding the option to narrow the data being processed to just the dates where we want N week horizon
+    dplyr::filter(horizon == timehorizon) # use "horizon" for JHU data. >1 horizon creates alloscore() merge errors
 }
 
 get_truth_data <- function(){
