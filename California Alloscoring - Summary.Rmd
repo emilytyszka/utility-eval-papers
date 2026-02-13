@@ -188,7 +188,6 @@ datesbyinfo
 
 ```
 
-
 ```{r echo=FALSE, warning=FALSE}
 
 # First row: 10/31/2020 and 12/11/21 (low info)
@@ -394,7 +393,6 @@ data %>%
 }
 
 ```
-
 
 ### October 31st, 2020 {.tabset}
 
@@ -678,12 +676,10 @@ California population data were sourced via the CA Department of Finance ([link 
 
 For the two periods, resource constraints were set so that it would be difficult/impossible to avoid underallocation across the locations. Recall that in situations of ample resources, allocation scores can be 0, since loss is easier to avoid, and in situations of very scarce resources, the unavoidable loss is very high and can make up the bulk of the loss value, also leading to lower allocation scores. In contrast, as resources get closer to true need, allocation scores can be expected to rise - the scare resources mean that the decision-making is very important. Again, the raw allocation scores of the experiment do not matter (the comparison is between scores of different models evaluated in the same experiment), but experimental setups that establish a resource constraint closer to the true need will avoid scores of 0 and therefore make interpretation of the scores more meaningful.
 
-
-
-
 For these reasons, we established resource constraints of 100,000 units and 200,000 units respectively for the XXXX
 
 # Allocation Score
+
 ```{r warning=FALSE, echo=FALSE}
 
 ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
@@ -1120,6 +1116,7 @@ kendall_test4_100 <- cor.test(summary4_100$alloscore, summary4_100$mwis, method 
 kendall_test4_100
 
 ```
+
 ## November 7th, 2020 {.tabset}
 
 ```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
@@ -1549,7 +1546,6 @@ kendall_test4_100
 
 ```
 
-
 ## December 11th, 2021 {.tabset}
 
 ```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
@@ -1863,7 +1859,6 @@ kendall_test4_200
 
 ```
 
-
 ## December 18th, 2021 {.tabset}
 
 ```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
@@ -2005,7 +2000,6 @@ kendall_test4_200 <- cor.test(summary4_200$alloscore, summary4_200$mwis, method 
 kendall_test4_200
 
 ```
-
 
 ## December 25th, 2021 {.tabset}
 
@@ -2149,7 +2143,6 @@ kendall_test4_200
 
 ```
 
-
 ## January 1st, 2022 {.tabset}
 
 ```{r warning=FALSE, message=FALSE, include=FALSE, echo=FALSE}
@@ -2291,6 +2284,7 @@ ggplot(data = summary_200 %>% filter(model != "per-capita"), aes(x=horizon, y=mw
 # kendall_test4_200
 
 ```
+
 # Integrated Allocation Score?
 
 # Insights
