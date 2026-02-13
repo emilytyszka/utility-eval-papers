@@ -11,30 +11,23 @@ determine_eligible_models <- function(forecast_dates, locations){
  
   ## load and filter forecasts
   load_forecasts(
-    dates = forecast_dates,
+    dates = values$forecast_dates,
     date_window_size = 6,
     types = c("quantile"),
-    ## need to make sure we are getting everyone's relative 14th horizon
-    targets = paste(1:6, "wk ahead inc case"),
-    locations = locations,
+    targets = c("1 wk ahead inc case", "3 wk ahead inc case"), # See Model Eligibility Test to see how this was settled upon
+    locations = reqd_locs,
     source = "zoltar",
     verbose = FALSE,
     as_of = NULL,
     hub = c("US")) |>
     align_forecasts() |>
-    dplyr::filter(
-      (model %in% models_to_include)#,
-      #relative_horizon == 14
-    ) |>
+    dplyr::filter((!model %in% models_to_drop)) |> # See Model Eligibility Test to see how this was settled upon
     group_by(model, reference_date) |>
-    summarize(nlocs = length(unique(location_name))) |>
-    ungroup() |>
-    filter(nlocs == length(locations)) |>
+    dplyr::summarize(nlocs = length(unique(location_name))) |>
+    ungroup() |> dplyr::filter(nlocs == length(reqd_locs)) |> # This was buggy - made more explicit
     group_by(model) |>
     mutate(ncomplete_weeks = n()) |>
-    ## ensure that any model has at least 4 weeks
-    ##  excludes 3 teams (UT, PSI, CUB)
-    filter(ncomplete_weeks >= 4) |>
+    dplyr::filter(ncomplete_weeks >= 2) |> # See Model Eligibility Test to see how this was settled upon
     pull(model) |>
     unique()
 }
