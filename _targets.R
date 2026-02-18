@@ -35,7 +35,7 @@ tar_source(files = c("R/data-ingestion.R",
                      "R/percap.R",
                      "R/plot_functions.R"))
 
-values <- tibble(forecast_dates = as.character(c(as.Date("2021-12-11"), as.Date("2022-01-01"), by = "7 days")))
+values <- tibble(forecast_dates = as.character(seq.Date(as.Date("2021-12-04"), as.Date("2022-01-01"), by = "7 days")))
 timehorizon1 <- 1
 timehorizon3 <- 3
 
@@ -45,7 +45,7 @@ timehorizon3 <- 3
 
 ## set of required locations: all counties in CA
 reqd_locs <- hub_locations |>
-  dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA") & location_name != "Los Angeles County")) |>
+  dplyr::filter(geo_type == "county" & (abbreviation %in% c("CA"))) |>
   dplyr::pull(fips)
 
 # Lists of targets:
