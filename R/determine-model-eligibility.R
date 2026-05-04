@@ -4,37 +4,28 @@ determine_eligible_models <- function(forecast_dates, locations){
 
   ## Drop several covidhub ensembles: COVIDhub-4_week_ensemble, COVIDhub_CDC-ensemble (keep trained and COVIDhub-ensemble)
   ## drop CU non-primary models: CU-nochange, CU-scenario_low, CU-scenario_mid
+  
   models_to_drop <- c("COVIDhub-4_week_ensemble", "COVIDhub_CDC-ensemble",
                       "CU-nochange", "CU-scenario_low", "CU-scenario_mid")
 
-  models_to_include <- c("CEID-Walk", "COVIDhub-4_week_ensemble", "COVIDhub-baseline", "CU-select", "FAIR-NRAR",  "IowaStateLW-STEM", "JHU_IDD-CovidSP", "JHUAPL-Bucky", "LANL-GrowthRate", "LNQ-ens1", "OneQuietNight-ML", "UChicagoCHATTOPADHYAY-UnIT")  
- 
   ## load and filter forecasts
   load_forecasts(
     dates = forecast_dates,
     date_window_size = 6,
     types = c("quantile"),
-    ## need to make sure we are getting everyone's relative 14th horizon
-    targets = paste(1:6, "wk ahead inc case"),
+    targets = paste(1:3, "wk ahead inc case"),
     locations = locations,
     source = "zoltar",
     verbose = FALSE,
     as_of = NULL,
     hub = c("US")) |>
-    align_forecasts() |>
+    align_forecasts() |>                   # After running this line: 17 models
     dplyr::filter(
-      (model %in% models_to_include)#,
-      #relative_horizon == 14
-    ) |>
+      !(model %in% models_to_drop)) |>    # After running this line: 12 models 
     group_by(model, reference_date) |>
     summarize(nlocs = length(unique(location_name))) |>
     ungroup() |>
-    filter(nlocs == length(locations)) |>
-    group_by(model) |>
-    mutate(ncomplete_weeks = n()) |>
-    ## ensure that any model has at least 4 weeks
-    ##  excludes 3 teams (UT, PSI, CUB)
-    filter(ncomplete_weeks >= 4) |>
+    filter(nlocs == length(locations)) |>  # After running this line: 9 models (drops PandemicCentral-COVIDForest, JHU_UNC_GAS-StatMechPool, FRBSF_Wilson-Econometric)
     pull(model) |>
     unique()
 }
