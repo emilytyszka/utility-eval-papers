@@ -35,7 +35,7 @@ tar_source(files = c("R/data-ingestion.R",
                      "R/percap.R",
                      "R/plot_functions.R"))
 
-values <- tibble(forecast_dates = as.character(seq.Date(as.Date("2021-12-11"), as.Date("2022-01-01"), by = "7 days")))
+values <- tibble(forecast_dates = as.character(seq.Date(as.Date("2021-12-18"), as.Date("2022-03-12"), by = "7 days")))
 timehorizon1 <- 1
 timehorizon3 <- 3
 
@@ -52,103 +52,108 @@ reqd_locs <- hub_locations |>
 setup <- list(
   tar_target(
     name = eligible_models,
-    command = determine_eligible_models(values$forecast_dates, locations = reqd_locs)
-  ),
+    command = determine_eligible_models(values$forecast_dates, locations = reqd_locs)),
+  
   tar_target(
-    name = forecast_data1,
+    name = forecast_data1_raw,
     command = get_forecast_data(values$forecast_dates, models = eligible_models, 
                                 locations = reqd_locs, timehorizon=timehorizon1, 
-                                date_of_interest = "2022-01-01")
-  ),
-  # tar_target(
-  #   name = forecast_data2,
-  #   command = get_forecast_data(values$forecast_dates, models = eligible_models, locations = reqd_locs, timehorizon=timehorizon2)
-  # ),
-  tar_target(
-    name = forecast_data3,
-    command = get_forecast_data(values$forecast_dates, models = eligible_models, 
-                                locations = reqd_locs, timehorizon=timehorizon3, 
-                                date_of_interest = "2022-01-01")
-  ),
+                                date_of_interest = "2022-01-01")),
+  
    tar_target(
-     name = truth_data,
-     command = get_truth_data()
-   ),
+     name = forecast_data3_raw,
+     command = get_forecast_data(values$forecast_dates, models = eligible_models, 
+                                 locations = reqd_locs, timehorizon=timehorizon3, 
+                                 date_of_interest = "2022-01-01")),
+  
    tar_target(
-     name = score_data1,
-     command = get_forecast_scores(forecast_data1, truth_data)
-   ),
-  tar_target(
-    name = score_data3,
-    command = get_forecast_scores(forecast_data3, truth_data)
-  ),
- tar_target(
-   name = Kat200k_alloscores1,
-   command = print(run_and_assemble_alloscores(forecast_data1,
-                                               truth_data,
-                                               reference_dates = values$forecast_dates,
-                                               one_K = 200000))
- ),
- tar_target(
-   name = Kat200k_alloscores3,
-   command = print(run_and_assemble_alloscores(forecast_data3,
-                                               truth_data,
-                                               reference_dates = values$forecast_dates,
-                                               one_K = 200000))
- ),
- tar_target(
-   name = pops22,
-   command = readxl::read_excel("data/CA_DeptOfFinance_PopEstim_2021-2025.xlsx", sheet = "Table 1 County State", skip = 2) |>
-     drop_na(`1/1/2021`) |>
-     mutate(full_location_name = ifelse(County == "State Total", "California",
-                                        paste(`County`, "County, CA")),
-            POPESTIMATE2021 = `1/1/2021`) |> select(full_location_name, POPESTIMATE2021) |>
-     dplyr::inner_join(hub_locations, by = join_by(full_location_name))
- )
+     name = forecast_data1,
+     command = generate_ensemble(forecast_data1_raw)),
+  
+   tar_target(
+     name = forecast_data3,
+     command = generate_ensemble(forecast_data3_raw)),
 )
+#   ),
+#    tar_target(
+#      name = truth_data,
+#      command = get_truth_data()
+#    ),
+#    tar_target(
+#      name = score_data1,
+#      command = get_forecast_scores(forecast_data1, truth_data)
+#    ),
+#   tar_target(
+#     name = score_data3,
+#     command = get_forecast_scores(forecast_data3, truth_data)
+#   ),
+#  tar_target(
+#    name = Kat200k_alloscores1,
+#    command = print(run_and_assemble_alloscores(forecast_data1,
+#                                                truth_data,
+#                                                reference_dates = values$forecast_dates,
+#                                                one_K = 200000))
+#  ),
+#  tar_target(
+#    name = Kat200k_alloscores3,
+#    command = print(run_and_assemble_alloscores(forecast_data3,
+#                                                truth_data,
+#                                                reference_dates = values$forecast_dates,
+#                                                one_K = 200000))
+#  ),
+#  tar_target(
+#    name = pops22,
+#    command = readxl::read_excel("data/CA_DeptOfFinance_PopEstim_2021-2025.xlsx", sheet = "Table 1 County State", skip = 2) |>
+#      drop_na(`1/1/2021`) |>
+#      mutate(full_location_name = ifelse(County == "State Total", "California",
+#                                         paste(`County`, "County, CA")),
+#             POPESTIMATE2021 = `1/1/2021`) |> select(full_location_name, POPESTIMATE2021) |>
+#      dplyr::inner_join(hub_locations, by = join_by(full_location_name))
+#  )
+# )
+# 
+# 
+# 
+# mapped1 <- tar_map(
+#   unlist = FALSE,
+#   values = values,
+#   tar_target(
+#     alloscore1,
+#     run_alloscore_one_date(forecast_data1, truth_data, forecast_dates)
+#     ))
+# mapped3 <- tar_map(
+#   unlist = FALSE,
+#   values = values,
+#   tar_target(
+#     alloscore3,
+#     run_alloscore_one_date(forecast_data3, truth_data, forecast_dates)
+#   ))
+# 
+# 
+# combined1 <- tar_combine(
+#   name = all_alloscore_data1,
+#   mapped1[["alloscore1"]],
+#   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
+# )
+# 
+# combined3 <- tar_combine(
+#   name = all_alloscore_data3,
+#   mapped3[["alloscore3"]],
+#   command = assemble_alloscores(dplyr::bind_rows(!!!.x))
+# )
+# 
+# 
+#  make_percap1_200 <- tar_target(
+#    name = percap1_200,
+#    command = score_per_capita_allocation(dat = Kat200k_alloscores1, pops = pops22)
+#  )
+# 
+#  make_percap3_200 <- tar_target(
+#    name = percap3_200,
+#    command = score_per_capita_allocation(dat = Kat200k_alloscores3, pops = pops22)
+#  )
 
-
-
-mapped1 <- tar_map(
-  unlist = FALSE,
-  values = values,
-  tar_target(
-    alloscore1,
-    run_alloscore_one_date(forecast_data1, truth_data, forecast_dates)
-    ))
-mapped3 <- tar_map(
-  unlist = FALSE,
-  values = values,
-  tar_target(
-    alloscore3,
-    run_alloscore_one_date(forecast_data3, truth_data, forecast_dates)
-  ))
-
-
-combined1 <- tar_combine(
-  name = all_alloscore_data1,
-  mapped1[["alloscore1"]],
-  command = assemble_alloscores(dplyr::bind_rows(!!!.x))
-)
-
-combined3 <- tar_combine(
-  name = all_alloscore_data3,
-  mapped3[["alloscore3"]],
-  command = assemble_alloscores(dplyr::bind_rows(!!!.x))
-)
-
-
- make_percap1_200 <- tar_target(
-   name = percap1_200,
-   command = score_per_capita_allocation(dat = Kat200k_alloscores1, pops = pops22)
- )
-
- make_percap3_200 <- tar_target(
-   name = percap3_200,
-   command = score_per_capita_allocation(dat = Kat200k_alloscores3, pops = pops22)
- )
-
-list(setup, mapped1, mapped3, combined1, combined3, make_percap1_200, make_percap3_200)
+list(setup) #, mapped1, mapped3, combined1, combined3, make_percap1_200, make_percap3_200)
 
 
 

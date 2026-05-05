@@ -37,11 +37,13 @@ alldata_drop_n <- unique(alldata_drop$model) # 12 models
 alldata_completeloc <- alldata_drop |>
   group_by(model, reference_date) |>
   summarize(nlocs = length(unique(location_name))) |>
-  ungroup() |>
+  ungroup() |> 
   filter(nlocs == length(locations)) 
+
 alldata_completeloc_n <- unique(alldata_completeloc$model) # 9 models - dropped PandemicCentral-COVIDForest, JHU_UNC_GAS-StatMechPool, FRBSF_Wilson-Econometric
 
 # get final list
-modellist <- alldata_completeloc_n |>
-  pull(model) |>
-  unique()
+modellist <- alldata_completeloc_n
+
+
+
