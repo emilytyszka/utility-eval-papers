@@ -22,8 +22,8 @@ determine_eligible_models <- function(forecast_dates, locations){
     align_forecasts() |>                   # After running this line: 17 models
     dplyr::filter(
       !(model %in% models_to_drop)) |>    # After running this line: 12 models 
-    group_by(model, reference_date) |>
-    summarize(nlocs = length(unique(location_name))) |>
+    dplyr::group_by(model, reference_date) |>
+    dplyr::summarize(nlocs = length(unique(location_name))) |>
     ungroup() |>
     filter(nlocs == length(locations)) |>  # After running this line: 9 models (drops PandemicCentral-COVIDForest, JHU_UNC_GAS-StatMechPool, FRBSF_Wilson-Econometric)
     pull(model) |>
