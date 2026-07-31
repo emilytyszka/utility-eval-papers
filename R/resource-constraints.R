@@ -5,8 +5,8 @@ calculate_resource_constraints <- function(truth_data){
     summarise(value = sum(value)) %>%
     dplyr::filter(target_end_date >= as.Date("2021-12-18")) %>%       # might want to make this changeable in _targets.R later
     dplyr::filter(target_end_date <= as.Date("2022-03-12")) %>% 
-    mutate(max = value*0.99,
-           min = value*0.81,
+    mutate(max = value*1.10,
+           min = value*0.70,
            mid = value*0.90)
 }
 
@@ -16,10 +16,10 @@ klist <- list()                                                             # cr
 
 # Calculate n values between min and max
 for (i in 1:nrow(K_constraints)) {
-  vec <- numeric(5)                                                         # for this first test, we're only doing 5 columns (min, max, 3 in between)
+  vec <- numeric(41)                                                        # for this analysis we're doing 41 columns (min, max, 39 in between: centered at 90% of true need, 70% to 110%)
   max <- K_constraints$max[i]
   min <- K_constraints$min[i]
-  vec <- seq(from = min, to = max, by=(max-min)/4)                          # slice into the 5 columns
+  vec <- seq(from = min, to = max, by=(max-min)/40)                         # slice into the 40 columns
   klist[[i]] <- vec                                                         # put all vectors in the list
 }
 

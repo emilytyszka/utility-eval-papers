@@ -1,0 +1,1069 @@
+---
+title: "Allocation Score Manuscript"
+subtitle: "Draft 1"
+author:
+  - name: Emily E. Tyszka, MPH (etyszka@umass.edu)
+  - name: "UMass SPHHS: Department of Biostatistics & Epidemiology"
+date: last-modified
+format:
+  pdf:
+    pdf-engine: lualatex
+    toc: false
+    geometry: margin=0.75in
+    fontsize: 11pt
+    header-includes: |
+        \usepackage{pdflscape}
+        \newcommand{\blandscape}{\begin{landscape}}
+        \newcommand{\elandscape}{\end{landscape}}
+bibliography: references.bib
+---
+
+```{r setup, include=FALSE, message=FALSE}
+
+library(covidHubUtils)
+library(targets)
+library(ggbump)
+library(kableExtra)
+library(ggpubr)
+library(ggtext)
+library(plotly)
+library(viridis)
+library(scoringRules)
+library(ggbump)
+library(paletteer)
+library(ggpmisc)
+library(tidyverse)
+
+### Score computation
+tar_load("truth_data")
+tar_load("forecast_data1wk")
+tar_load("forecast_data3wk")
+tar_load("alloscores1wk")
+tar_load("alloscores3wk")
+tar_load("percap1")
+tar_load("percap3")
+tar_load("resource_constraint_grid")
+tar_load("score_data1wk")
+tar_load("score_data3wk")
+```
+
+# Abstract
+
+([**write something snazzy here**]{.underline})
+
+# Introduction
+
+```{r Data cleaning, message=FALSE, echo=FALSE, warning=FALSE}
+
+# Combine all datasets
+alloscores1wk <- alloscores1wk %>% mutate(horizon = 1)
+percap1 <- percap1 %>% mutate(horizon = 1)
+alloscores3wk <- alloscores3wk %>% mutate(horizon = 3) %>%
+  mutate(filterout = paste(model,target_end_date)) %>%                       # CU-select only reporting for 56 counties in wk 3!
+  dplyr::filter(filterout != "CU-select 2021-12-18") %>% select(-filterout)
+
+percap3 <- percap3 %>% mutate(horizon = 3)
+all_alloscores_data <- rbind(alloscores1wk, alloscores3wk, percap1, percap3)
+
+# Get and merge with the 90% constraints
+resource_constraints90 <- resource_constraint_grid %>% select(target_end_date, value) %>% 
+  mutate(constraint90 = value*0.90)
+all_alloscores_data90 <- all_alloscores_data %>% merge(resource_constraints90, by = "target_end_date") %>% 
+  dplyr::filter(round(K)==round(constraint90)) %>% select(-constraint90) %>%
+  mutate(filterout = paste(model,target_end_date, horizon)) %>%                       # CU-select - remove again for some reason
+  dplyr::filter(filterout != "CU-select 2021-12-18 3") %>% select(-filterout)
+
+# Calculate AS
+all_alloscores <- all_alloscores_data90 %>%
+  group_by(model, target_end_date, horizon) %>%
+  mutate(components = case_when(              # This line gets rid of negatives by turning
+    components <= 0 ~ abs(`components`),      # neg values (undershoots) to absolute value
+    components > 0 ~  0                       # and pos values (overshoots) to 0. Comment 
+  )) %>%                                       # out this chunk to go back to the old method.
+  summarize(alloscore = sum(components), yobs = sum(y)) %>%
+  group_by(target_end_date, horizon) %>%
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) %>%
+  ungroup() %>%
+  complete(model, target_end_date) %>%
+  mutate(target_end_date = as.Date(target_end_date)) 
+
+# Retrieve other scores
+alloscore_models <- unique(all_alloscores$model)
+score_data_summaries1 <- score_data1wk %>%
+  dplyr::filter(model %in% alloscore_models) %>%
+  group_by(model, target_end_date) %>%
+  summarize(MWIS = mean(wis)) %>%
+  ungroup() %>%
+  group_by(target_end_date) %>%
+  mutate(nmodels = n(),
+         MWIS_rank = rank(MWIS, ties.method = "min"),
+         MWIS_rank_std = 1- (MWIS_rank-1)/(nmodels-1)) %>%
+  ungroup() %>%
+  complete(model, target_end_date) %>% mutate(horizon = 1)
+score_data_summaries3 <- score_data3wk %>%
+  dplyr::filter(model %in% alloscore_models) %>%
+  group_by(model, target_end_date) %>%
+  summarize(MWIS = mean(wis)) %>%
+  ungroup() %>%
+  group_by(target_end_date) %>%
+  mutate(nmodels = n(),
+         MWIS_rank = rank(MWIS, ties.method = "min"),
+         MWIS_rank_std = 1- (MWIS_rank-1)/(nmodels-1)) %>%
+  ungroup() %>%
+  complete(model, target_end_date) %>% mutate(horizon = 3)
+score_data_summaries <- rbind(score_data_summaries1, score_data_summaries3)
+
+# IAS 
+all_ias <- all_alloscores_data %>%
+  group_by(model, K, horizon, target_end_date) %>%
+  summarize(`Allocation score` = sum(components)) %>%
+  group_by(model, horizon, target_end_date) %>%
+  summarize(IAS = mean(`Allocation score`)) %>% ungroup() %>%
+  group_by(horizon, target_end_date) %>%
+  mutate(ias_rank = rank(IAS, ties.method = "min"))
+
+all_scores <- left_join(all_alloscores, score_data_summaries,
+                      by=c("model", "target_end_date", "horizon")) 
+all_scores <- left_join(all_scores, all_ias,
+                      by=c("model", "target_end_date", "horizon")) 
+```
+
+## Forecast Use in Decision-Making and Need for Use-Aware Evaluation Metrics
+
+In recent years, infectious disease forecasting has been used increasingly in public health surveillance and outbreak response. Accurate, timely forecasts of infectious disease indicators provide state, tribal, local, and territorial (STLT) practitioners with advance notice of local and national trends, enabling for rapid response to disease burden spikes, both through pharmaceutical and nonpharmaceutical interventions and through public information-sharing. Well-performing forecasts have the potential to contribute substantially to existing arsenals of public health tools, increasing the effectiveness of agencies' health-promotion efforts. \[[**CITE IF POSSIBLE**]{.underline}\] Most notably, infectious disease forecasts came into widespread usage during the COVID-19 pandemic, through projects such as the COVID-19 Forecast Hub[@home-c]. Additional large scale examples of forecast adoption include CDC FluSight[@cdc2026] and the Dengue Forecasting Project[@johansson2019], in which forecasts submitted by modeling groups were compiled, assessed, and used to inform both local and national public health policy. Modeling groups themselves recommend use of their forecasts for a range of objectives, including public communications, advance notice of spikes for hospitals and health departments, and to aid decisions around the allocation of medical resources and staffing.[@lutz2019] Indeed, a recent review of COVID-19 forecast usage found that, during the COVID-19 pandemic, jurisdictions applied these forecasts to uses such as understanding transmission dynamics, directing planning, and guiding resource management and allocation. [@rao2025]
+
+However, as jurisdictions increasingly adopt these tools, a number of issues remain, and of these, the potential for misalignment between the priorities of infectious disease modelers and STLT practitioners is of particular relevance. Misaligned goals between these two groups risks the development of models that fail to answer relevant public health questions, or that prove unsuitable for use in high-stakes policy decision-making due to incorrectly defined forecasting targets, unreliable predictions, or lack of interpretability.[@metcalf2015] Productive engagement between forecasters and practitioners therefore requires that models be created, evaluated, and adopted with both the public health need and the priorities of the acting public health agency in mind.
+
+Forecast evaluation metrics that align closely with public health goals are a vital part of this alignment. In order to ensure that models perform well in practice, forecast scoring metrics are used to evaluate and rank forecasts, based on comparisons between predicted outcomes and ground truth results. A range of methods exist to conduct these evaluations, each with differing assumptions and objects of measurement.[@bjerregård2021] Any definition of a "best" forecast is dependent upon which qualities the evaluation metric values most – this may include the closeness of point estimates to the ground truth, the width of prediction intervals, or the correct relative ranking of predicted values across a group of targets.\[[**CITE CITE CITE**]{.underline}\] For this reason, forecast evaluation should include metrics that approximate user priorities, so that the best-scoring models in the evaluation phase of implementation are indeed those the most suited to the forecasting use of interest.
+
+In this case study, we present an example of the application of the integrated allocation score (IAS), an evaluation metric that scores infectious disease forecasts based on effective resource allocation across multiple forecast targets, in the context of the COVID-19 omicron wave in California. We hope that this study can serve as an example of IAS's usage in a highly uncertain public health context, and reveal its qualities through contrast with other scoring methods.
+
+## Allocation Score and Integrated Allocation Score
+
+High accuracy and precision in forecasts of individual targets may not necessarily translate to optimal decision-making in dynamic scenarios with multiple allocation targets. The distribution of resources under constraint is a high priority for public health policy-makers and decision-makers in epidemic contexts, such as in scenarios of personal protective equipment (PPE) distribution \[[**CITE**]{.underline}\]. The allocation score (AS), introduced by Gerding et al.[@gerding2024], scores forecasts on their success in allocating limited resources across multiple locations.
+
+For a given target date, this method interprets a forecast's predictions as location-specific estimates of resource need and uses these predictions to guide the allocation of a fixed quantity of resource. The forecast is then scored by comparing this forecast-informed distribution scheme to an "oracle distribution" produced from the the ground truth (ie. true resource need): for both distributions, the total resource underallocation across all locations is tallied, and the difference between the resource underallocation of the oracle distribution (considered to be unavoidable) and that of the forecast-informed distribution is the allocation score. Lower scores reflect less avoidable underallocation of resources by the forecast and therefore better predictions. This negative orientation aligns with other commonly used forecast scoring metrics, such as WIS.
+
+To address uncertainty with regards to resource constraints, the integrated allocation score (IAS) is preferred. IAS is determined by calculating AS across a series of possible resource constraints and producing an average, which has the option of being weighted based on the perceived probabilities of the possible resource constraints, or unweighted using a uniform distribution.
+
+## Example: Allocation Score of the 1-week COVIDhub-baseline forecast for January 1st, 2022
+
+As a illustrative example, we will visualize the calculation of an allocation score for the COVIDhub-baseline forecast for the target date of January 1st, 2022 at the 1 week horizon, using country-level COVID-19 case forecasts for the State of California, with the exception of Los Angeles County. For the purpose of scoring, predictions of COVID-19 incident cases are used here as proxies for need of an abstract, apportionable resource. For this example, we set a resource constraint equal to 90% of the total incident cases for the date of interest: for the week ending 01/01/2022, a total of 131,492 cases were reported, and so the resource constraint for this target date is set at 118,343 units of resource, 90% of this. These resources are distributed based on the county-level incident case predictions of the COVIDhub-baseline forecast for this target date and horizon. (See [Methods] for more details on the distribution of resources from a forecast in quantile format.) In Figure 1, we see a breakdown of this resource allocation, in which red shading indicates underallocation to a location, blue shading indicates overallocation, and purple shading indicates addressed need.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width = 7, fig.align = 'center', fig.cap= "Under- and Overallocation of Resources Based on COVIDhub-baseline Forecast for 01/01/2022. Resource constraint of 90% of true need, forecasting at the 1 week horizon"}
+
+targetdateofinterest <- "2022-01-01"
+ordered_levels <- truth_data %>%
+  dplyr::filter(target_end_date == "2022-01-01", location_name != "California") %>%
+  select(full_location_name, abbreviation, value) %>%
+  arrange(-value)
+
+multiloc_dat <- all_alloscores_data90 %>%
+  dplyr::filter(target_end_date == targetdateofinterest,
+         full_location_name != "Los Angeles County, CA") %>%
+  dplyr::filter(model == "COVIDhub-baseline") %>%
+  dplyr::filter(horizon == "1") %>%
+  rename(allocation = x, `observed resource need` = y) %>%
+  mutate(`unmet resource need` = ifelse(allocation < `observed resource need`,
+                                        `observed resource need` - allocation,
+                                        0),
+         `need met by allocated resources` = ifelse(allocation < `observed resource need`,
+                                                    allocation,
+                                                    `observed resource need`),
+         `allocation exceeding need` = ifelse(allocation < `observed resource need`,
+                                        0,
+                                        allocation - `observed resource need`)) %>%
+  select(model, target_end_date, full_location_name,
+         `unmet resource need`, `need met by allocated resources`, `allocation exceeding need`) %>%
+  pivot_longer(cols = c("unmet resource need", "need met by allocated resources", "allocation exceeding need")) %>%
+  mutate(county = factor(full_location_name, levels=ordered_levels$full_location_name),
+         name = factor(name, levels = c("unmet resource need",
+                                        "allocation exceeding need",
+                                        "need met by allocated resources"))) %>%
+  arrange(name)
+
+# reorder the model name variable via final alloscore
+as_variable <- all_scores %>% dplyr::filter(target_end_date == targetdateofinterest) %>%
+  dplyr::filter(horizon == "1")  %>% select(model, alloscore)
+multiloc_dat <- multiloc_dat %>% 
+  merge(as_variable, by="model") %>%
+  mutate("model" = as.factor(`model`)) 
+multiloc_dat <- multiloc_dat %>%
+  mutate(model = fct_reorder(model, .x = alloscore)) %>%
+  dplyr::filter(model == "COVIDhub-baseline") 
+as_variable <- as_variable %>%
+  mutate(model = fct_reorder(model, .x = alloscore)) %>%
+  dplyr::filter(model == "COVIDhub-baseline") 
+
+alloc_plot <- ggplot(multiloc_dat, aes(x=county, y=value, fill=name)) +
+  geom_col(position="stack", alpha=1) +
+  scale_fill_manual(name=NULL, values = c("#fb6a4a", "#9ecae1", "#807dba")) +
+  theme(axis.text.x=element_text(angle=90,vjust=.5, hjust=1, size = 6), 
+        legend.position = "bottom", 
+        legend.justification = c(1,1), legend.key.size = unit(0.45, "cm"), 
+        legend.background = element_rect(fill = "transparent"), 
+        legend.text = element_text(size=8)) +
+  ylab("Resource need /allocation") +
+  xlab(NULL) +  theme(strip.text.y = element_text(angle = 0, size=8)) + 
+  geom_text(data = as_variable, size=3, aes(x = 48, y = 15000, fill=NULL,
+                                     label = paste("Allocation Score =",round(alloscore)),
+                                     color = NULL)) +
+  theme(plot.title = element_text(size=10.5), plot.subtitle = element_text(size=8),
+                                                                                                        axis.title=element_text(size=8))
+                                                                                            
+ alloc_plot
+```
+
+Overall underallocation is calculated by summing this red-shaded underallocation across all counties (17,324 units of resource). On a similar graph of the oracle distribution (not shown), the red shaded areas will represent unavoidable underallocation, as the oracle distribution is assumed to be ideal. Given a resource constraint of 90%, it follows that an oracle scheme will inevitably underallocate resources by 10%, and so unavoidable underallocation is known to be 10% of true need (13,149 units). Allocation score is then calculated as the difference between these two quantities (total underallocation minus unavoidable underallocation; 4,175) to estimate avoidable resource underallocation due to the forecast predictions.
+
+Notably, overallocation (shown in blue) is not directly counted by AS, but due to resources being finite, a forecast with a large amount of overallocation will inevitably have a worse allocation score, due to incorrectly distributed resources.
+
+In practice, decision-makers may lack a definitive estimate of true resource availability. Furthermore, the calculation of AS from a single resource constraint may fail to capture resource distribution dynamics at higher or lower constraints. For this reason, the integrated allocation score is produced as an average of a range of possible resource constraints. For this example, an unweighted mean of a 41 allocation scores from 70-110% of true need (92,044-144,642 units of resource) were calculated to produce an IAS of 12,284. As with AS, lower scores of IAS are indicative of better performing forecasts, and so this score may be compared to those of other forecasts for the same target date to assess model performance.
+
+# Methods
+
+In this case study, forecasts of county-level incident COVID-19 cases during the omicron wave were evaluated for the state of California using IAS and MWIS.
+
+## Data Sources
+
+Forecast data were sourced from the COVID-19 Forecast Hub, a central repository of forecasts and predictions submitted by international research groups.[@data-c] Submissions are compiled in a standardized format for defined targets, locations, and time horizons, allowing for visualization, scoring, and analysis of forecasts.
+
+Forecasts from the Hub's Zoltar repository[@project:] were extracted for a total of 13 target dates covering the duration of the omicron wave (12/18/2021 to 03/12/2022; MMWR weeks 2021-50 to 2022-12), at both the 1 and 3 week horizons. Target of interest was the county-level weekly incident COVID-19 case counts for all California counties with the exception of Los Angeles County (n=57), which was excluded due to the existence of significant resource lines from the federal government \[[**CITE**]{.underline}\]. Since most other counties in the state receive a majority of their resources from the State of California, Los Angeles County's allocation framework was deemed significantly different from the other counties as to justify its exclusion from the analysis. Through dropping this county, resource allocation could be conceived as coming from one centralized decision-maker, and COVID-19 case count could be used as a direct proxy for resource need.
+
+Ground truth counts of county-level incident cases were retrieved via the load_truth function in the covidHubUtils package, using the the JHU repository \[[**too technical? how exactly to cite this data source?**]{.underline}\]. For the calculation of population-based resource allocations, country-level population estimates for January 1st, 2021 were sourced from the State of California Department of Finance.[@e-4popu].
+
+## Model Selection
+
+Forecast submissions were deemed eligible for analysis if they included predictions for all 57 counties of interest on a given target date and horizon. Additionally, redundant Forecasting Hub ensembles were dropped (COVIDhub-4_week_ensemble was retained) as well as redundant models from Columbia University.
+
+![Forecast Model Selection Process](Model%20Selection.png){width="60%"}
+
+In addition to eligible individual forecast submissions, an ensemble forecast, named the "eligible-models-ensemble," was generated as an unweighted average of all models with eligible submissions for each respective target end date and horizon, excepting the Hub's existing ensemble forecast (COVIDhub-4_week_ensemble). Quantile estimates for the eligible-models-ensemble were produced as an unweighted average of qualifying submissions for that quantile - for example, to produce a 0.90 ensemble estimate for a given county, horizon, and target date, the mean was calculated from the 0.90 estimates from all eligible models submitting for that county, horizon, and date.
+
+Finally, a "per-capita" allocation scheme, in which the units of resource were allocated proportionally to estimated county population, ignoring epidemiological data, was evaluated as a control.
+
+## Statistical Analysis
+
+### Resource Distribution from Probabilistic Forecasts
+
+\[[**Insert here**]{.underline}\]
+
+### Integrated Allocation Score
+
+For each respective target date and horizon, integrated allocation scores for forecasts were calculated with resource constraints ranging from 70% to 110% of ground truth case count (true need) at the respective target date (one allocation score for each percent between 70% and 110%, centered at 90% of true need, n = 41).
+
+```{r echo=FALSE, warning=FALSE, fig.cap= "Omicron Wave in California: Allocation Score Resource Constraints (90% of true need, 70%-110% of true need)"}
+
+truth_data_ca <- truth_data %>% dplyr::filter(location_name != "California" & location_name != "Los Angeles County") %>% 
+  dplyr::filter(target_end_date > as.Date("2021-10-15")) %>% 
+  dplyr::filter(target_end_date < as.Date("2022-06-15")) %>%
+  group_by(target_end_date) %>%
+  summarise(value = sum(value)) %>% 
+  mutate(max = value*1.10,
+           min = value*0.70,
+           mid = value*0.90)
+
+dates_forecasts <- truth_data_ca %>% 
+  dplyr::filter(target_end_date > as.Date("2021-12-17")) %>% 
+  dplyr::filter(target_end_date < as.Date("2022-03-15"))
+date_peak <- truth_data_ca %>% dplyr::filter(target_end_date == as.Date("2022-01-15"))
+
+
+
+
+
+resourceconstraintplot <- ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) +
+  geom_ribbon(aes(ymin = min, ymax = max), fill = "grey90") + 
+  geom_point(size=0.5) + 
+  geom_line() + 
+  labs(x = "MMWR Week End Date", y ="Weekly Incident Cases") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        plot.title = element_text(size = 12),
+        plot.subtitle = element_text(size = 10)) + 
+  geom_point(data = dates_forecasts, aes(x=target_end_date, y=value), shape=15, size= 2.5, color="#00BFC4") +
+  geom_line(aes(x=target_end_date, y=mid), color="grey50", size=0.25)
+  
+  
+resourceconstraintplot
+
+```
+
+### Pairwise Comparisons
+
+In addition to IAS, forecasts were evaluated via weighted interval score (WIS) for each target date, county, and horizon.[@bracher2021] Mean WIS (MWIS) was calculated as the unweighted average WIS score across all 57 counties for a given target date and horizon. Kendall's tau ($\tau$) was used to evaluate agreement in relative rankings of models between scoring metrics at the two horizons.\[[**CHECK**]{.underline}\]
+
+### Technical
+
+All analyses were run in R version 4.6.1 and `targets` package version 1.11.3 [@landau2021]. AS and IAS were calculated using the `alloscore` package [@gerding2026] and WIS scores using the `scoringutils` package[@bosse].
+
+# Results
+
+## Model Availability
+
+At the 1 and 3 week forecast horizons, a total of 9 forecast-informed allocation schemes were evaluated, respectively, including the per-capita and eligible-models-ensemble schemes. Figure 4 outlines eligible forecast submissions (defined as submissions providing the required quantiles for all 57 counties of interest) by target date. Following model selection, all eligible forecast submissions were used in the analysis and (with the exception of the COVIDhub-4_week_ensemble) incorporated into the eligible-models-ensemble.
+
+```{r echo=FALSE, warning=FALSE, fig.cap="Complete Forecast Submissions by Model and Date"}
+
+reported <- rbind(forecast_data1wk, forecast_data3wk) %>% 
+  dplyr::filter(location_name != "Los Angeles County")
+
+pointestimatecompleteness <- as.data.frame(table(reported$model, reported$target_end_date,
+                                                 reported$horizon, reported$quantile))
+pointestimatecompleteness <- rename(as_tibble(pointestimatecompleteness), Model = Var1, Date = Var2, Horizon = Var3, Quantile = Var4)
+pointestimatecompleteness$Freq <- as.numeric(pointestimatecompleteness$Freq)
+pointestimatecompleteness <- pointestimatecompleteness %>% dplyr::mutate(FreqDiscrete = case_when(
+  Freq< 57 ~ "No Prediction",
+  Freq>=57  ~ "Prediction",
+  TRUE ~ NA))
+pointestimatecompleteness$Date <- as.factor(pointestimatecompleteness$Date)
+
+
+plotcompleteness <- function(data, quantile, horizon) { 
+data %>%
+  dplyr::filter(Quantile == quantile) %>% dplyr::filter(Horizon == horizon) %>%
+  ggplot(aes(y=Model, x=Date, fill=FreqDiscrete), color= "#A6CEE3FF") +
+  geom_tile(color= "#A6CEE3FF") + 
+  scale_color_manual(
+    name = "Forecast Submission",
+    values = c("Prediction" = "#1F78B4FF", 
+               "No Prediction" = "white" 
+               ), 
+    labels = c("Prediction", "No Prediction"),
+    aesthetics = "fill")  +
+  theme(axis.text.x=element_text(angle=60, hjust=1), legend.position = "none")
+}
+
+plotcompleteness(pointestimatecompleteness, quantile = 0.75, horizon = 1)
+```
+
+## Integrated Allocation Score
+
+```{r message=FALSE, warning = FALSE, echo = FALSE}
+# Test of whether scores were better than per-capita
+per_cap_IAS <- all_scores %>% dplyr::filter(model == "per-capita") %>% 
+  select(target_end_date, horizon, IAS) %>% dplyr::rename("per-capita IAS" = IAS)
+score_comparison_percap_IAS <- all_scores %>% dplyr::filter(model != "per-capita") %>% 
+  merge(per_cap_IAS, by = c("target_end_date", "horizon")) %>%
+  mutate(compare_per_cap = case_when(IAS < `per-capita IAS` ~ "Better",
+                                     IAS > `per-capita IAS` ~ "Worse",
+                                     TRUE ~ NA))
+beat_percap_model_IAS <- score_comparison_percap_IAS %>%
+  group_by(model, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+beat_percap_horizon_IAS <- score_comparison_percap_IAS %>%
+  group_by(horizon, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+beat_percap_modelhorizon_IAS <- score_comparison_percap_IAS %>%
+  group_by(model, horizon, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+beat_percap_targethorizon_IAS <- score_comparison_percap_IAS %>%
+  group_by(target_end_date, horizon, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+beat_percap_target_IAS <- score_comparison_percap_IAS %>%
+  group_by(target_end_date, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, include=FALSE, fig.width = 7, fig.align = 'center'}
+
+# set chart's colors manually:
+#paletteer_d("RColorBrewer::Paired")
+# Colors are:
+#A6CEE3FF #1F78B4FF #B2DF8AFF #33A02CFF #FB9A99FF #E31A1CFF #FDBF6FFF #FF7F00FF #CAB2D6FF #6A3D9AFF #FFFF99FF #B15928FF 
+
+graphcolors <- c( "#1F78B4FF", "#B2DF8AFF", "#33A02CFF", "#FB9A99FF","#E31A1CFF","#A6CEE3FF",  "#FF7F00FF", "#CAB2D6FF", "#6A3D9AFF")
+
+all_scores %>% dplyr::filter(horizon=="1") %>% ggplot(aes(x=target_end_date, y=IAS, group = model, color = model)) + scale_color_manual(
+    values = graphcolors) +
+  geom_point() + 
+  geom_line() + 
+  labs(x = "MMWR Week End Date", y ="Integrated Allocation Score") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+
+all_scores %>% dplyr::filter(horizon=="3") %>% ggplot(aes(x=target_end_date, y=IAS, group = model, color = model)) + scale_color_manual(
+    values = graphcolors) +
+  geom_point() + 
+  geom_line() + 
+  labs(x = "MMWR Week End Date", y ="Integrated Allocation Score") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width = 7, fig.align = 'center', fig.cap="Integrated Allocation Scores Over Time, by Horizon - Unweighted Average of 70% - 110% Resource Constraints"}
+
+all_scores %>% dplyr::mutate(horizon_display = dplyr::case_when(
+      horizon == 1 ~ "1 Week Horizon",
+      horizon == 3 ~ "3 Week Horizon",
+      TRUE ~ NA)) %>% drop_na(horizon_display) %>%
+  ggplot(aes(x=target_end_date, y=IAS, group = model, color = model)) + scale_color_manual(
+    values = graphcolors) +
+  geom_point() + 
+  geom_line() + 
+  labs(x = "MMWR Week End Date", y ="Integrated Allocation Score") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) + facet_wrap(~horizon_display, nrow=1) +
+  theme(legend.position= "bottom", legend.box="horizontal", legend.text=element_text(size=6), legend.margin=margin())
+```
+
+Integrated allocation score results were found to be noisy (Figure 5), but largely scaled with the epidemic curve. At the 1-week horizon, IAS values were typically lower than those at the 3-week horizon and models scored better than the per-capita control more frequently (53.7% at the 1-week horizon, 18.6% at the 3-week horizon). At the 1-week horizon, 5 of the 8 submitting models (COVIDhub-4_week_ensemble, CUBoulder-COVIDLSTM, eligible-models-ensemble, CU-select, JHUAPL-Bucky) outscored the per-capita allocation in more than half of their predictions. In contrast, at the 3-week horizon, no model scored better than the per-capita distribution in more than half of its predictions. Of the models, only the CUBoulder-COVIDLSTM (predictions = 25, 60%) and COVIDhub-4_week_ensemble (predictions = 26, 53.8%) models scored better than the per-capita allocation in more than half of their predictions over the two horizons.
+
+Of the forecast target dates, IAS values for December 18th were better than per-capita most frequently, with 13 of the 15 predictions (86.7%) scoring better via IAS than the per-capita allocation, followed by February 26th, with 9 of the 14 predictions (64.3%) scoring better. In contrast, predictions for all other target dates scored better than the per-capita allocation less than half of the time. Disparities between IAS scores of the per-capita allocation and the other models were particularly dramatic at the 3-week horizon during the peak weeks of the epidemic, when the IAS scores for many models were 3 or more times that of the per-capita distribution.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.align = 'center'}
+# Calculate Scores Relative to per-capita control
+per_cap_IAS <- all_scores %>% dplyr::filter(model == "per-capita") %>% 
+  select(target_end_date, horizon, IAS) %>% 
+  rename("per-capita integrated alloscore" = IAS)
+relative_IAS <- all_scores %>% 
+  merge(per_cap_IAS, by = c("target_end_date", "horizon")) %>%
+  select(model, target_end_date, horizon, IAS, `per-capita integrated alloscore`) %>%
+  mutate("relative integrated alloscore" = `IAS`/`per-capita integrated alloscore`)
+relative_IAS <- relative_IAS %>%
+  dplyr::mutate(
+    model_display = dplyr::case_when(
+      model == "per-capita" ~ "per-capita",
+      model == "eligible-models-ensemble" ~ "eligible-models-ensemble",
+      model == "COVIDhub-4_week_ensemble" ~ "COVIDhub-4_week_ensemble",
+      model == "COVIDhub-baseline" ~ "COVIDhub-baseline",
+      TRUE ~ "Other"
+    )
+  ) %>% dplyr::mutate(model_display = factor(model_display, 
+                                             levels = c("per-capita", 
+                                                        "COVIDhub-4_week_ensemble",
+                                                        "eligible-models-ensemble", 
+                                                        "COVIDhub-baseline", "Other"))) %>%
+    dplyr::mutate(horizon_display = dplyr::case_when(
+      horizon == 1 ~ "1 Week Horizon",
+      horizon == 3 ~ "3 Week Horizon",
+      TRUE ~ NA)) %>% 
+        dplyr::mutate(horizon_display = factor(horizon_display, 
+                                             levels = c("1 Week Horizon", "3 Week Horizon")))
+
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.align = 'center', fig.cap = "Integrated Allocation Scores Relative to Per-Capita Allocation, by Target Date"}
+
+# REVISED VERSION OF RELATIVE PLOTS THAT IS FACET WRAPPED
+# Graph - highlighted models = eligible-models-ensemble, covidhub-baseline
+relative_IAS_subset <- relative_IAS %>% 
+  dplyr::filter(model %in% c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline"))
+ggplot(data = relative_IAS, 
+       mapping = aes(x = target_end_date, y = `relative integrated alloscore`, group = model,
+                     color = `model_display`)) +
+  geom_line(size= 0.75) +
+  scale_color_manual(name="Model", 
+                     values=c("per-capita"="black","COVIDhub-4_week_ensemble" = "#A6CEE3FF", 
+                              "eligible-models-ensemble"="#E31A1CFF",
+                              "COVIDhub-baseline" = "#1F78B4FF", "Other"= "grey"),
+                     labels = c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline", "Other"),
+                     drop = F) +
+  geom_line(data = relative_IAS_subset,
+            size = 1) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  ylab("IAS Relative to Per-Capita") +
+  xlab("Forecast Date") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1.0, hjust = 1.0),
+    plot.title.position = "plot",
+    legend.position = "bottom", axis.title = element_text(size=8), 
+    legend.text=element_text(size=6)) + 
+  scale_y_continuous(labels = scales::percent) + facet_wrap(~horizon_display, nrow=1)
+
+```
+
+Figure 7 displays the IAS values as a percentage of the IAS of the control per-capita distribution, with select models highlighted (COVIDhub04_week_ensemble, eligible-models-ensemble, and COVIDhub-baseline). In this visualization, lines under the bolded black line (per-capita) indicate better allocation performance. Both ensemble models were found to frequently score lower than the per-capita distribution at the 1 week horizon, but not at the 3-week horizon. Scores were notably higher than the per-capita score on January 22nd (the peak of the epidemic) at the 3-week horizon, with all forecast IAS scores at least double that of the per-capita distribution.
+
+## Pairwise Comparisons
+
+Pairwise comparisons between the different scoring metrics found relative score rankings via 90% AS, IAS, and MWIS to be broadly in alignment via Kendall's tau \[[Table 1]{.underline}\]. Furthermore, rankings in scores at the 1-week horizon were found to align with rankings of scores at the 3-week horizon for all three metrics (90% AS: $\tau$ = 0.802; IAS: $\tau$ = 0.645; MWIS: $\tau$ = 0.711).
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.align = 'center'}
+
+all_scores_1wk <- all_scores %>% dplyr::filter(horizon == 1) %>% 
+  select(model, target_end_date, alloscore, IAS, MWIS) %>%
+  rename("IAS 1 week" = IAS,
+         "alloscore 1 week" = alloscore,
+         "MWIS 1 week" = MWIS)
+all_scores_3wk <- all_scores %>% dplyr::filter(horizon == 3) %>% 
+  select(model, target_end_date, alloscore, IAS, MWIS) %>%
+  rename("IAS 3 week" = IAS,
+         "alloscore 3 week" = alloscore,
+         "MWIS 3 week" = MWIS)
+all_scores_paired <- merge(all_scores_1wk, all_scores_3wk, by = c("model", "target_end_date"), all = TRUE)
+
+# 1 vs 3 week
+kendall_AS_1vs3 <- cor.test(all_scores_paired$`alloscore 1 week`, all_scores_paired$`alloscore 3 week`, 
+                       use = "pairwise.complete.obs", method = 'kendall')$estimate ## AS
+# cor.test(all_scores_paired$`alloscore 1 week`, all_scores_paired$`alloscore 3 week`, 
+#                        use = "pairwise.complete.obs", method = 'kendall') ## AS p value
+kendall_IAS_1vs3 <- cor.test(all_scores_paired$`IAS 1 week`, all_scores_paired$`IAS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'kendall')$estimate ## IAS
+# cor.test(all_scores_paired$`IAS 1 week`, all_scores_paired$`IAS 3 week`, 
+#                        use = "pairwise.complete.obs", method = 'kendall') ## IAS p value
+kendall_MWIS_1vs3 <- cor.test(all_scores_paired$`MWIS 1 week`, all_scores_paired$`MWIS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'kendall')$estimate ## MWIS
+# cor.test(all_scores_paired$`MWIS 1 week`, all_scores_paired$`MWIS 3 week`, 
+#                        use = "pairwise.complete.obs", method = 'kendall') ## MWIS p value
+
+# 1 week
+kendall_1wk_ASvsIAS <- cor.test(all_scores_paired$`alloscore 1 week`, all_scores_paired$`IAS 1 week`, 
+                       use = "pairwise.complete.obs", method = 'kendall')$estimate ## AS vs IAS
+kendall_1wk_ASvsMWIS <- cor.test(all_scores_paired$`alloscore 1 week`, all_scores_paired$`MWIS 1 week`, 
+                       use = "pairwise.complete.obs", method = 'kendall')$estimate  ## AS vs MWIS
+kendall_1wk_IASvsMWIS <- cor.test(all_scores_paired$`IAS 1 week`, all_scores_paired$`MWIS 1 week`, 
+                       use = "pairwise.complete.obs", method = 'kendall')$estimate ## IAS vs MWIS
+
+# 3 week
+kendall_3wk_ASvsIAS <- cor.test(all_scores_paired$`alloscore 3 week`, all_scores_paired$`IAS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'kendall')$estimate ## AS vs IAS
+kendall_3wk_ASvsMWIS <- cor.test(all_scores_paired$`alloscore 3 week`, all_scores_paired$`MWIS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'kendall')$estimate  ## AS vs MWIS
+kendall_3wk_IASvsMWIS <- cor.test(all_scores_paired$`IAS 3 week`, all_scores_paired$`MWIS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'kendall')$estimate ## IAS vs MWIS
+
+# Make a table of these
+Comparison <- c("1 week", "3 week")
+`90% AS vs. IAS` <- c(kendall_1wk_ASvsIAS, kendall_3wk_ASvsIAS)
+`90% AS vs. MWIS` <- c(kendall_1wk_ASvsMWIS, kendall_3wk_ASvsMWIS)
+`IAS vs. MWIS` <- c(kendall_1wk_IASvsMWIS, kendall_3wk_IASvsMWIS)
+kendallcomparisons <- tibble(Comparison, `90% AS vs. IAS`, `90% AS vs. MWIS`, `IAS vs. MWIS`)
+
+knitr::kable(kendallcomparisons,
+             caption = "Kendall's $\\tau$ values for pairwise tests")
+```
+
+## Normal- vs. Uniform-Weighting in IAS Calculation
+
+# Discussion
+
+-   AS overall
+
+    -   Stresses underallocation but indirectly captures overallocation
+    -   For a single AS, requires users to select a specific resource constraint.
+    -   AS performance driven by biggest counties being captured accurately
+
+-   IAS overall
+
+    -   Addresses uncertainty in resource constraint; noise in AS
+
+-   IAS results found that models largely failed to beat the control resource distribution at most timepoints and both horizons.
+
+    -   The worst IAS performance, when scaled to the IAS of the control distribution, was found to occur at the peak of epidemic. The periods prior to the epidemic and during the decrease found mixed results.
+
+    -   The frequent failure of the models to beat the IAS of the per-capita distribution at critical points largely suggests a lack of value-added from forecast-informed resource distribution in this use case.
+
+    -   However, out of the models assessed, the 2 ensemble models assessed had some of the lowest scores and outscored the per-capita distribution most often. Further, these
+
+-   IAS scores at the 1-week horizon were found to be the lower than those at the 3-week horizon and more likely to outscore the per-capita distribution, implying that resource distribution decisions made with shorter-term forecasts more accurately addressed ground-truth need than those further in advance.
+
+-   Comparisons
+
+    -   When compared to MWIS and AS at a 90% resource constraint, IAS values were found to be strongly positively associated with these other measures.
+
+    -   Use of Kendall's $\tau$ to compare rankings of forecasts found the 3 scores to be largely concordant with one another, especially IAS and MWIS.
+
+    -   FORECASTING IN CALI PAPER - BEST MODEL?
+
+-   
+
+# Conclusions
+
+\[MOVED FROM METHODS\] It should be noted that since the forecasting target is reported cases, which is one of the earliest indicators of infectious disease activity, forecasters on neither date had the benefit of a strong leading indicator of activity. This is in contrast with other disease metrics that lag case counts, such as (for example) hospitalization or death forecasts, for which forecasting may be easier.
+
+\[MOVED FROM INTRO\] Because AS rewards forecasts that correctly capture relative resource needs across locations, these evaluation metrics may prove meaningful to public health decision-makers involved in multi-jurisdictional resource distribution efforts. This method produces a measurement of avoidable, unaddressed resource need in a scenario where the forecast directly informs policy-making, rewarding models that capture the relative rankings of needs correctly across the locations of interest.
+
+\[MOVED FROM INTRO However, the AS should not be viewed as an exhaustive assessment of effectively-forecast resource need and requires several considerations during interpretation. First, it should be noted that the method measures underallocation, not overallocation, in the distribution of resource to the locations, meaning that it does not penalize scenarios of potential health resource waste. Second, the measurement of underallocation as an unweighted sum of all targets means that locations with large populations and/or resource needs will contribute more to the score than smaller ones, an assumption that is valid in field situations, but which potentially overlooks forecasts with strong performance in smaller locations in a set. Third, AS does not directly account for the predictive distribution of the forecasts being evaluated, and so sharper predictions are not rewarded. Finally, in this scheme, the correct prediction of absolute values is secondary to the capture of relative rankings - a forecast which predicts every location as having exactly double the ground truth need would score better on the AS than one where all but a few locations were predicted perfectly \[[**CHECK THIS**]{.underline}\].
+
+## Implications for Public Health Decision-Making
+
+-   ISSUES:
+
+    -   Data quality and lack of granularity
+
+        -   "13 of the included studies highlighted barriers in data infrastructure \[20,22,25,34,46\]. In general, the study of decision makers in North-Carolina mentions hesitancies in the use of modelling due to “concerns about the quality of data used in models” \[16\]. Delayed and inconsistent epidemiological data reporting emerges as the most pervasive challenge across modelling efforts \[20,22,25,28,34,37,39,46\]. A lack of granularity of data hindered addressing subpopulation-specific questions \[16,25,42\]. Sherratt et al. show that “biased representations of subpopulations in each data source” cause differences in transmission estimates, highlighting the need for decision-makers to be made aware of source populations of used data \[42\]." [@rao2025] pg 11
+
+        -   **Especially in the context of multiple forecasts being made simultaneously, having "weakest link" locations with poor data can impact allocation schemes**
+
+    -   
+
+# \[TO BE DELETED/ADDED TO APPENDIX: RESULTS HOLDING PEN\]
+
+## Rankings
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+bumpchart_1wk <- all_alloscores %>% dplyr::filter(horizon=="1") %>%
+  mutate(Week = as.integer(factor(target_end_date))) %>%
+  ggplot(aes(x = Week, y = allo_rank, color = model)) +
+  geom_bump(size = 1) +
+  geom_point(size = 3) + 
+  ggtitle("Allocation Score Model Rankings: 1 Week Horizon") +
+  scale_color_brewer(palette = "Paired") +
+  theme_bw() + 
+  ylab("Allocation Score Rank") + 
+  scale_y_continuous(breaks = c(1:15), minor_breaks = NULL, transform = "reverse") + 
+  scale_x_continuous(breaks = c(1:15), minor_breaks = NULL) + 
+  guides(color=guide_legend(title="Model"))
+  
+bumpchart_1wk
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+bumpchart_3wk <- all_alloscores %>% dplyr::filter(horizon=="3") %>%
+  mutate(Week = as.integer(factor(target_end_date))) %>%
+  ggplot(aes(x = Week, y = allo_rank, color = model)) +
+  geom_bump(size = 1) +
+  geom_point(size = 3) + 
+  ggtitle("Allocation Score Model Rankings: 3 Week Horizon") + scale_color_manual(
+    values = graphcolors) + 
+  theme_bw() + 
+  ylab("Allocation Score Rank") + 
+  scale_y_continuous(breaks = c(1:15), minor_breaks = NULL, transform = "reverse") + 
+  scale_x_continuous(breaks = c(1:15), minor_breaks = NULL) + 
+  guides(color=guide_legend(title="Model"))
+  
+bumpchart_3wk
+```
+
+## Allocation Score
+
+```{r include = FALSE, message = FALSE, warning = FALSE}
+
+# Test of whether scores were better than per-capita
+per_cap_AS <- all_scores %>% dplyr::filter(model == "per-capita") %>% 
+  select(target_end_date, horizon, alloscore) %>% rename("per-capita alloscore" = alloscore)
+score_comparison_percap <- all_scores %>% dplyr::filter(model != "per-capita") %>% 
+  merge(per_cap_AS, by = c("target_end_date", "horizon")) %>%
+  mutate(compare_per_cap = case_when(alloscore < `per-capita alloscore` ~ "Better",
+                                     alloscore > `per-capita alloscore` ~ "Worse",
+                                     TRUE ~ NA))
+beat_percap_model <- score_comparison_percap %>%
+  group_by(model, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+beat_percap_horizon <- score_comparison_percap %>%
+  group_by(horizon, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+beat_percap_modelhorizon <- score_comparison_percap %>%
+  group_by(model, horizon, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+beat_percap_targethorizon <- score_comparison_percap %>%
+  group_by(target_end_date, horizon, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+beat_percap_target <- score_comparison_percap %>%
+  group_by(target_end_date, compare_per_cap) %>%
+  summarise(n = n()) %>% pivot_wider(names_from = compare_per_cap, values_from = n) %>%
+  replace_na(list(Better = 0, Worse = 0)) %>%
+  mutate("percent better" = Better/(Better + Worse))
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.width = 7, fig.align = 'center'}
+
+all_scores %>% dplyr::filter(horizon=="1") %>% ggplot(aes(x=target_end_date, y=alloscore, group = model, color = model)) + scale_color_manual(
+    values = graphcolors) +
+  geom_point() + 
+  geom_line() + 
+  labs(title = "Allocation Scores Over Time - 1 week horizon", 
+       subtitle = "90% Resource Constraints",
+       x = "MMWR Week End Date", y ="Allocation Score") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+
+all_scores %>% dplyr::filter(horizon=="3") %>% ggplot(aes(x=target_end_date, y=alloscore, group = model, color = model)) + scale_color_manual(
+    values = graphcolors) +
+  geom_point() + 
+  geom_line() + 
+  labs(title = "Allocation Scores Over Time - 3 week horizon", 
+       subtitle = "90% Resource Constraints",
+       x = "MMWR Week End Date", y ="Allocation Score") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+
+```
+
+At both the 1- and 3- week horizons, raw allocation scores were found to scale approximately with the epidemic curve, with the maximum AS values for many models occurring on the weeks of January 15th and January 22nd, the peak of the epidemic. Assessment of under- and over-allocation broken up by county \[SUPPLEMENTAL RED PURPLE BLUE GRAPHS?\] found the forecasts with the lowest allocation scores to be those that most accurately captured patterns of true need across the highest-burden counties.
+
+The forecasts frequently failed to score better in allocation score than the per-capita allocation scheme: in total, 49.0% of predictions (52.6% at the 1-week horizon, 45.4% at the 3-week horizon) achieved lower scores than a per-capita allocation for the same target date. At the 1-week horizon, 4 of the 8 models scored better than the per-capita scheme in over half of their submissions (COVIDhub-4_week_ensemble (predictions = 13, 61.5%), eligible-models-ensemble (predictions =13, 61.5%), FAIR-NRAR (predictions = 5, 60.0%), and JHUAPL-Bucky (predictions = 13, 53.8%)). At the 3-week horizon, CU-select (predictions = 13, 58.3%) was the only model to score better than per-capita scheme in over half of its submissions.
+
+Of the forecast target dates, predictions for March 5th scored better than per-capita most frequently, with 100% of the 14 submissions scoring better than the per-capita allocation. In contrast, on January 15, none of the submitted predictions at either horizon scored better than the per-capita allocation. Notably, predictions for the weeks at the height of the epidemic (January 8th - 29th) had the lowest rates of outscoring the per-capita scheme - of the 62 predictions submitted for those weeks, only 6.5% (2 predictions at the 1-week horizon, 2 at the 3-week horizon) scored lower. Meanwhile, predictions scored better than per-capita at the highest frequencies on the target dates at the very beginning of the wave (12/18/2021, 80.0%; 12/25/2021, 81.3%) and as cases decelerated (03/05/2022, 100%; 02/12/2022, 85.7%, 02/19/2022, 85.7%).
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, include=FALSE}
+
+# Calculate Scores Relative to per-capita control
+relative_alloscore <- all_scores %>% 
+  merge(per_cap_AS, by = c("target_end_date", "horizon")) %>%
+  select(model, target_end_date, horizon, alloscore, `per-capita alloscore`) %>%
+  mutate("relative alloscore" = alloscore/`per-capita alloscore`)
+relative_alloscore <- relative_alloscore %>%
+  dplyr::mutate(
+    model_display = dplyr::case_when(
+      model == "per-capita" ~ "per-capita",
+      model == "eligible-models-ensemble" ~ "eligible-models-ensemble",
+      model == "COVIDhub-4_week_ensemble" ~ "COVIDhub-4_week_ensemble",
+      model == "COVIDhub-baseline" ~ "COVIDhub-baseline",
+      TRUE ~ "Other" )) %>% 
+  dplyr::mutate(model_display = 
+                  factor(model_display, levels = c("per-capita","COVIDhub-4_week_ensemble",
+                                                   "eligible-models-ensemble", 
+                                                   "COVIDhub-baseline", 
+                                                   "Other"))) %>%
+    dplyr::mutate(horizon_display = dplyr::case_when(
+      horizon == 1 ~ "1 Week Horizon",
+      horizon == 3 ~ "3 Week Horizon",
+      TRUE ~ NA)) %>% 
+        dplyr::mutate(horizon_display = factor(horizon_display, 
+                                             levels = c("1 Week Horizon", "3 Week Horizon")))
+
+```
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.align = 'center'}
+# REVISED VERSION OF RELATIVE PLOTS THAT IS FACET WRAPPED
+# Graph - highlighted models = eligible-models-ensemble, covidhub-baseline
+relative_alloscore_subset <- relative_alloscore %>% 
+  dplyr::filter(model %in% c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline"))
+ggplot(data = relative_alloscore, 
+       mapping = aes(x = target_end_date, y = `relative alloscore`, group = model,
+                     color = `model_display`)) +
+  geom_line(size= 0.75) +
+  scale_color_manual(name="Model", 
+                     values=c("per-capita"="black","COVIDhub-4_week_ensemble" = "#A6CEE3FF", 
+                              "eligible-models-ensemble"="#E31A1CFF",
+                              "COVIDhub-baseline" = "#1F78B4FF", "Other"= "grey"),
+                     labels = c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline", "Other"),
+                     drop = F) +
+  geom_line(data = relative_alloscore_subset,
+            size = 1) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  ylab("AS Relative to Per-Capita") +
+  xlab("Forecast Date") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1.0, hjust = 1.0),
+    plot.title.position = "plot",
+    legend.position = "bottom", axis.title = element_text(size=10), 
+    legend.text=element_text(size=6)
+  ) + labs(title = "Allocation Score Relative to Per-Capita Allocation") + scale_y_continuous(labels = scales::percent) + facet_wrap(~horizon_display, nrow=1)
+
+```
+
+In figure \[[**NUMBER**]{.underline}\], allocation scores of select models are shown as a percentage of the score of the per-capita allocation: the COVIDhub-baseline forecast predicts that the COVID-19 incident case count for each target of interest will be equal to the most recent observed incidence for that target, while the COVIDhub-4_week_ensemble and eligible-models-ensemble are both ensemble models with differing criteria and weighting \[**CHECK - DOCUMENTATION WONT LOAD RIGHT NOW**\]. At both horizons, allocation scores for the baseline model were frequently found to be worse than those of the per-capita allocation. Meanwhile, the ensemble models scored worse than the per-capita allocation during the highest-burden time periods in the epidemic, but largely exhibited better allocation scores at the beginning and end of the wave. Overall, the scores of the two ensemble models mirrored each other closely and were lower than those of the baseline model.
+
+## Relative
+
+### AS
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+
+relative_alloscore_1 <- relative_alloscore %>% dplyr::filter(horizon==1)
+relative_alloscore_3 <- relative_alloscore %>% dplyr::filter(horizon==3)
+
+# Graph - highlighted models = eligible-models-ensemble, covidhub-baseline
+relative_alloscore_1_subset <- relative_alloscore_1 %>% 
+  dplyr::filter(model %in% c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline"))
+ggplot(data = relative_alloscore_1, 
+       mapping = aes(x = target_end_date, y = `relative alloscore`, group = model,
+                     color = `model_display`)) +
+  geom_line(size= 0.75) +
+  scale_color_manual(name="Model", 
+                     values=c("per-capita"="black","COVIDhub-4_week_ensemble" = "#A6CEE3FF", 
+                              "eligible-models-ensemble"="#E31A1CFF",
+                              "COVIDhub-baseline" = "#1F78B4FF", "Other"= "grey"),
+                     labels = c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline", "Other"),
+                     drop = F) +
+  geom_line(data = relative_alloscore_1_subset,
+            size = 1) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  ylab("AS Relative to Per-Capita") +
+  xlab("Forecast Date") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1.0, hjust = 1.0),
+    plot.title.position = "plot",
+    legend.position = "bottom", axis.title = element_text(size=10), 
+    legend.text=element_text(size=6)
+  ) + labs(title = "Allocation Score Relative to Per-Capita Allocation", 
+           subtitle = "1 week horizon") + scale_y_continuous(labels = scales::percent)
+
+relative_alloscore_3_subset <- relative_alloscore_3 %>% 
+  dplyr::filter(model %in% c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline"))
+ggplot(data = relative_alloscore_3, 
+       mapping = aes(x = target_end_date, y = `relative alloscore`, group = model,
+                     color = `model_display`)) +
+  geom_line(size= 0.75) +
+  scale_color_manual(name="Model", 
+                     values=c("per-capita"="black", "COVIDhub-4_week_ensemble" = "#A6CEE3FF",
+                              "eligible-models-ensemble"="#E31A1CFF",
+                              "COVIDhub-baseline" = "#1F78B4FF", "Other"= "grey"),
+                     labels = c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline", "Other"),
+                     drop = F) +
+  geom_line(data = relative_alloscore_3_subset,
+            size = 1) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  ylab("AS Relative to Per-Capita") +
+  xlab("Forecast Date") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1.0, hjust = 1.0),
+    plot.title.position = "plot",
+    legend.position = "bottom", axis.title = element_text(size=10), 
+    legend.text=element_text(size=6)
+  ) + labs(title = "Allocation Score Relative to Per-Capita Allocation", 
+           subtitle = "3 week horizon") + scale_y_continuous(labels = scales::percent)
+```
+
+### IAS
+
+```{r message=FALSE, echo=FALSE, warning=FALSE}
+relative_IAS_1 <- relative_IAS %>% dplyr::filter(horizon==1)
+relative_IAS_3 <- relative_IAS %>% dplyr::filter(horizon==3)
+
+# Graph - highlighted models = eligible-models-ensemble, covidhub-baseline
+relative_IAS_1_subset <- relative_IAS_1 %>% 
+  dplyr::filter(model %in% c("per-capita", "eligible-models-ensemble", 
+                             "COVIDhub-4_week_ensemble", "COVIDhub-baseline"))
+ggplot(data = relative_IAS_1, 
+       mapping = aes(x = target_end_date, y = `relative integrated alloscore`, group = model,
+                     color = `model_display`)) +
+  geom_line(size= 0.5) +
+  scale_color_manual(name="Model", 
+                     values=c("per-capita"="black","COVIDhub-4_week_ensemble" = "#A6CEE3FF", 
+                              "eligible-models-ensemble"="#E31A1CFF",
+                              "COVIDhub-baseline" = "#1F78B4FF", "Other"= "grey"),
+                     labels = c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline", "Other"),
+                     drop = F) +
+  geom_line(data = relative_IAS_1_subset,
+            size = 1) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  ylab("IAS Relative to Per-Capita") +
+  xlab("Forecast Date") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1.0, hjust = 1.0),
+    plot.title.position = "plot",
+    legend.position = "bottom", axis.title = element_text(size=10), 
+    legend.text=element_text(size=6)
+  ) + labs(title = "Integrated Allocation Score Relative to Per-Capita Allocation", 
+           subtitle = "1 week horizon") + scale_y_continuous(labels = scales::percent)
+
+relative_IAS_3_subset <- relative_IAS_3 %>% 
+  dplyr::filter(model %in% c("per-capita", "eligible-models-ensemble", 
+                             "COVIDhub-4_week_ensemble", "COVIDhub-baseline"))
+ggplot(data = relative_IAS_3, 
+       mapping = aes(x = target_end_date, y = `relative integrated alloscore`, group = model,
+                     color = `model_display`)) +
+  geom_line(size= 0.5) +
+  scale_color_manual(name="Model", 
+                     values=c("per-capita"="black","COVIDhub-4_week_ensemble" = "#A6CEE3FF", 
+                              "eligible-models-ensemble"="#E31A1CFF",
+                              "COVIDhub-baseline" = "#1F78B4FF", "Other"= "grey"),
+                     labels = c("per-capita", "COVIDhub-4_week_ensemble", 
+                                "eligible-models-ensemble", "COVIDhub-baseline", "Other"),
+                     drop = F) +
+  geom_line(data = relative_IAS_3_subset,
+            size = 1) +
+  scale_x_date(date_breaks = "1 month", date_labels = "%b %Y") +
+  ylab("IAS Relative to Per-Capita") +
+  xlab("Forecast Date") +
+  theme_bw() +
+  theme(
+    axis.text.x = element_text(angle = 45, vjust = 1.0, hjust = 1.0),
+    plot.title.position = "plot",
+    legend.position = "bottom", axis.title = element_text(size=10), 
+    legend.text=element_text(size=6)
+  ) + labs(title = "Integrated Allocation Score Relative to Per-Capita Allocation", 
+           subtitle = "3 week horizon") + scale_y_continuous(labels = scales::percent)
+
+```
+
+## Pairwise Comparisons
+
+### 1 vs 3 week
+
+```{r echo=FALSE, warning=FALSE, message = FALSE}
+# For each target date + model, match the 1 and 3 week scores
+all_scores_1wk <- all_scores %>% dplyr::filter(horizon == 1) %>% 
+  select(model, target_end_date, alloscore, IAS, MWIS) %>%
+  rename("IAS 1 week" = IAS,
+         "alloscore 1 week" = alloscore,
+         "MWIS 1 week" = MWIS)
+all_scores_3wk <- all_scores %>% dplyr::filter(horizon == 3) %>% 
+  select(model, target_end_date, alloscore, IAS, MWIS) %>%
+  rename("IAS 3 week" = IAS,
+         "alloscore 3 week" = alloscore,
+         "MWIS 3 week" = MWIS)
+all_scores_paired <- merge(all_scores_1wk, all_scores_3wk, by = c("model", "target_end_date"), all = TRUE)
+
+ggplot(data = all_scores_paired, 
+       aes(x=`alloscore 1 week`, y = `alloscore 3 week`)) + 
+  geom_smooth(method = "lm", se = FALSE, color = "grey", size = 0.5) + 
+  geom_point(aes(color = `model`)) + theme_bw() +  
+  labs(title = "Pairwise Comparisons: Allocation Score (90% of Need) at 1 vs. 3 weeks") + 
+  xlab("1 week") + ylab("3 week") + stat_poly_eq(use_label(c("eq", "R2")))
+ggplot(data = all_scores_paired, 
+       aes(x=`IAS 1 week`, y = `IAS 3 week`)) + 
+  geom_smooth(method = "lm", se = FALSE, color = "grey", size = 0.5) + 
+  geom_point(aes(color = `model`)) + theme_bw() +  
+  labs(title = "Pairwise Comparisons: Integrated Allocation Score at 1 vs. 3 weeks") + 
+  xlab("1 week") + ylab("3 week") + stat_poly_eq(use_label(c("eq", "R2")))
+ggplot(data = all_scores_paired, 
+       aes(x=`MWIS 1 week`, y = `MWIS 3 week`)) + 
+  geom_smooth(method = "lm", se = FALSE, color = "grey", size = 0.5) + 
+  geom_point(aes(color = `model`)) + theme_bw() +  
+  labs(title = "Pairwise Comparisons: MWIS at 1 vs. 3 weeks") + 
+  xlab("1 week") + ylab("3 week") + stat_poly_eq(use_label(c("eq", "R2")))
+```
+
+### AS vs IAS
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+
+ggplot(data = all_scores_paired, 
+       aes(x=`alloscore 1 week`, y = `IAS 1 week`)) + 
+  geom_smooth(method = "lm", se = FALSE, color = "grey", size = 0.5) + 
+  geom_point(aes(color = `model`)) + theme_bw() +  
+  labs(title = "Pairwise Comparisons: Allocation Score (90% of Need) vs. Integrated Allocation Score",
+       subtitle = "1 week") + 
+  xlab("Allocation Score") + ylab("IAS") + stat_poly_eq(use_label(c("eq", "R2")))
+
+ggplot(data = all_scores_paired, 
+       aes(x=`alloscore 3 week`, y = `IAS 3 week`)) + 
+  geom_smooth(method = "lm", se = FALSE, color = "grey", size = 0.5) + 
+  geom_point(aes(color = `model`)) + theme_bw() +  
+  labs(title = "Pairwise Comparisons: Allocation Score (90% of Need) vs. Integrated Allocation Score",
+       subtitle = "3 week") + 
+  xlab("Allocation Score") + ylab("IAS") + stat_poly_eq(use_label(c("eq", "R2")))
+
+```
+
+### AS vs MWIS
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(data = all_scores_paired, 
+       aes(x=`alloscore 1 week`, y = `MWIS 1 week`)) + 
+  geom_smooth(method = "lm", se = FALSE, color = "grey", size = 0.5) + 
+  geom_point(aes(color = `model`)) + theme_bw() +  
+  labs(title = "Pairwise Comparisons: Allocation Score (90% of Need) vs. Mean WIS",
+       subtitle = "1 week") + 
+  xlab("Allocation Score") + ylab("MWIS") + stat_poly_eq(use_label(c("eq", "R2")))
+
+ggplot(data = all_scores_paired, 
+       aes(x=`alloscore 3 week`, y = `MWIS 3 week`)) + 
+  geom_smooth(method = "lm", se = FALSE, color = "grey", size = 0.5) + 
+  geom_point(aes(color = `model`)) + theme_bw() +  
+  labs(title = "Pairwise Comparisons: Allocation Score (90% of Need) vs. Mean WIS",
+       subtitle = "3 week") + 
+  xlab("AS") + ylab("MWIS") + stat_poly_eq(use_label(c("eq", "R2")))
+```
+
+### IAS vs MWIS
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+ggplot(data = all_scores_paired, 
+       aes(x=`IAS 1 week`, y = `MWIS 1 week`)) + 
+  geom_smooth(method = "lm", se = FALSE, color = "grey", size = 0.5) + 
+  geom_point(aes(color = `model`)) + theme_bw() +  
+  labs(title = "Pairwise Comparisons: Integrated Allocation Score vs. Mean WIS",
+       subtitle = "1 week") + 
+  xlab("Allocation Score") + ylab("MWIS") + stat_poly_eq(use_label(c("eq", "R2")))
+
+ggplot(data = all_scores_paired, 
+       aes(x=`IAS 3 week`, y = `MWIS 3 week`)) + 
+  geom_smooth(method = "lm", se = FALSE, color = "grey", size = 0.5) + 
+  geom_point(aes(color = `model`)) + theme_bw() +  
+  labs(title = "Pairwise Comparisons: Integrated Allocation Score vs. Mean WIS",
+       subtitle = "3 week") + 
+  xlab("IAS") + ylab("MWIS") + stat_poly_eq(use_label(c("eq", "R2")))
+
+```
+
+### Pearsons
+
+```{r echo=FALSE, warning=FALSE, message=FALSE, fig.width = 7, fig.align = 'center'}
+
+# Overall
+pearson_all_ASvsIAS <- cor(all_scores$alloscore, all_scores$IAS, use = "pairwise.complete.obs", method = 'pearson') ## AS vs IAS
+pearson_all_ASvsMWIS <- cor(all_scores$alloscore, all_scores$MWIS, use = "pairwise.complete.obs", method = 'pearson')  ## AS vs MWIS
+pearson_all_IASvsMWIS <- cor(all_scores$IAS, all_scores$MWIS, use = "pairwise.complete.obs", method = 'pearson')  ## IAS vs MWIS
+
+# 1 vs 3 week
+pearson_AS_1vs3 <- cor(all_scores_paired$`alloscore 1 week`, all_scores_paired$`alloscore 3 week`, 
+                       use = "pairwise.complete.obs", method = 'pearson') ## AS
+# cor.test(all_scores_paired$`alloscore 1 week`, all_scores_paired$`alloscore 3 week`, 
+#                        use = "pairwise.complete.obs", method = 'pearson') ## AS p value
+pearson_IAS_1vs3 <- cor(all_scores_paired$`IAS 1 week`, all_scores_paired$`IAS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'pearson') ## IAS
+# cor.test(all_scores_paired$`IAS 1 week`, all_scores_paired$`IAS 3 week`, 
+#                        use = "pairwise.complete.obs", method = 'pearson') ## IAS p value
+pearson_MWIS_1vs3 <- cor(all_scores_paired$`MWIS 1 week`, all_scores_paired$`MWIS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'pearson') ## MWIS
+# cor.test(all_scores_paired$`MWIS 1 week`, all_scores_paired$`MWIS 3 week`, 
+#                        use = "pairwise.complete.obs", method = 'pearson') ## MWIS p value
+
+# 1 week
+pearson_1wk_ASvsIAS <- cor(all_scores_paired$`alloscore 1 week`, all_scores_paired$`IAS 1 week`, 
+                       use = "pairwise.complete.obs", method = 'pearson') ## AS vs IAS
+pearson_1wk_ASvsMWIS <- cor(all_scores_paired$`alloscore 1 week`, all_scores_paired$`MWIS 1 week`, 
+                       use = "pairwise.complete.obs", method = 'pearson')  ## AS vs MWIS
+pearson_1wk_IASvsMWIS <- cor(all_scores_paired$`IAS 1 week`, all_scores_paired$`MWIS 1 week`, 
+                       use = "pairwise.complete.obs", method = 'pearson') ## IAS vs MWIS
+
+# 3 week
+pearson_3wk_ASvsIAS <- cor(all_scores_paired$`alloscore 3 week`, all_scores_paired$`IAS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'pearson') ## AS vs IAS
+pearson_3wk_ASvsMWIS <- cor(all_scores_paired$`alloscore 3 week`, all_scores_paired$`MWIS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'pearson')  ## AS vs MWIS
+pearson_3wk_IASvsMWIS <- cor(all_scores_paired$`IAS 3 week`, all_scores_paired$`MWIS 3 week`, 
+                       use = "pairwise.complete.obs", method = 'pearson') ## IAS vs MWIS
+
+# Make a table of these
+Comparison <- c("Both horizons", "1 week", "3 week")
+`90% AS vs IAS` <- c(pearson_all_ASvsIAS, pearson_1wk_ASvsIAS, pearson_3wk_ASvsIAS)
+`90% AS vs MWIS` <- c(pearson_all_ASvsMWIS, pearson_1wk_ASvsMWIS, pearson_3wk_ASvsMWIS)
+`IAS vs MWIS` <- c(pearson_all_IASvsMWIS, pearson_1wk_IASvsMWIS, pearson_3wk_IASvsMWIS)
+pearsoncomparisons <- tibble(Comparison, `90% AS vs IAS`, `90% AS vs MWIS`, `IAS vs MWIS`)
+
+knitr::kable(pearsoncomparisons,
+             caption = "Pearson correlation $\\rho$ values for pairwise tests")
+
+```
+
+# Bibliography

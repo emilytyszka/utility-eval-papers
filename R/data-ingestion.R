@@ -25,7 +25,8 @@ get_forecast_data <- function(forecast_dates, models = models_to_include, locati
 # Create Ensemble of Available Forecasts for a Given Day
 generate_ensemble <- function(forecast_data){
   require(dplyr)
-  forecast_data_new <- forecast_data %>% dplyr::group_by(reference_date, location, horizon, relative_horizon, temporal_resolution, target_variable, 
+  forecast_data_new <- forecast_data %>% dplyr::filter(!str_detect(model, "ensemble")) %>% #REMOVE ensembles (but leave UVA-Ensemble - it's an ensemble of something else)
+    dplyr::group_by(reference_date, location, horizon, relative_horizon, temporal_resolution, target_variable, 
                            target_end_date, type, quantile, location_name, population, geo_type, geo_value, abbreviation, 
                            full_location_name) %>%                                 # everything is grouped except for "model" and "value"
                     dplyr::summarise(value=mean(value),                            # calculates mean estimate of value for all models for given quantile + date + location

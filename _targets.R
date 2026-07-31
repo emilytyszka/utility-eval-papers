@@ -19,7 +19,7 @@ conflicts_prefer(stats::lag)
 
 # Set target options:
 tar_option_set(
-  controller = crew_controller_local(workers = 2),
+  controller = crew_controller_local(workers = 1),
   packages = c("tidyverse", "covidHubUtils", "distfromq", "alloscore", "gh"), # packages that your targets need to run
   imports = c("alloscore"),
   format = "rds" # default storage format

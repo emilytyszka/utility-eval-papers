@@ -21,12 +21,14 @@ forecast_data <- load_forecasts(                                                
     hub = c("US")) |>
     align_forecasts() |>
     dplyr::filter(horizon == timehorizon) |> #|> # use "horizon" for JHU data. >1 horizon creates alloscore() merge errors
-    select(-forecast_date)                       # removing "forecast_date" because it isn't used after this and it creates a headache in ensembling
+    select(-forecast_date)                     # removing "forecast_date" because it isn't used after this and it creates a headache in ensembling
     #dplyr::filter(target_end_date == date_of_interest) # adding the option to narrow the data being processed to just the dates where we want N week horizon
 
 
 # Create Ensemble of Available Forecasts for a Given Day
-forecast_data <- forecast_data %>% group_by(reference_date, location, horizon, relative_horizon, temporal_resolution, target_variable, 
+forecast_data <- forecast_data %>% 
+  dplyr::filter(!str_detect(model, "ensemble")) %>% 
+  group_by(reference_date, location, horizon, relative_horizon, temporal_resolution, target_variable, 
                                                 target_end_date, type, quantile, location_name, population, geo_type, geo_value, abbreviation, 
                                                 full_location_name) %>%                                 # everything is grouped except for "model" and "value"
                                        summarise(value=mean(value)) %>%                                 # calculates mean estimate for the quantile + date + location

@@ -2,11 +2,11 @@ determine_eligible_models <- function(forecast_dates, locations){
   require(covidHubUtils)
   require(tidyverse)
 
-  ## Drop several covidhub ensembles: COVIDhub-4_week_ensemble, COVIDhub_CDC-ensemble (keep trained and COVIDhub-ensemble)
+  ## Drop covidhub ensembles not of interest: COVIDhub_CDC-ensemble, COVIDhub-ensemble, COVIDhub-trained_ensemble (keep COVIDhub-4_week_ensemble)
   ## drop CU non-primary models: CU-nochange, CU-scenario_low, CU-scenario_mid
   
-  models_to_drop <- c("COVIDhub-4_week_ensemble", "COVIDhub_CDC-ensemble",
-                      "CU-nochange", "CU-scenario_low", "CU-scenario_mid")
+  models_to_drop <- c("COVIDhub_CDC-ensemble", "COVIDhub-ensemble", "COVIDhub-trained_ensemble",
+                      "CU-nochange", "CU-scenario_low", "CU-scenario_mid", "UChicagoCHATTOPADHYAY-UnIT") # U Chicago dropped from pipeline due to completeness - only reports 3 times
 
   ## load and filter forecasts
   load_forecasts(
@@ -21,11 +21,11 @@ determine_eligible_models <- function(forecast_dates, locations){
     hub = c("US")) |>
     align_forecasts() |>                   # After running this line: 17 models
     dplyr::filter(
-      !(model %in% models_to_drop)) |>    # After running this line: 12 models 
+      !(model %in% models_to_drop)) |>    # After running this line: 10 models 
     dplyr::group_by(model, reference_date) |>
     dplyr::summarize(nlocs = length(unique(location_name))) |>
     ungroup() |>
-    filter(nlocs == length(locations)) |>  # After running this line: 9 models (drops PandemicCentral-COVIDForest, JHU_UNC_GAS-StatMechPool, FRBSF_Wilson-Econometric)
+    dplyr::filter(nlocs == length(locations)) |>  # After running this line: 7 models (drops PandemicCentral-COVIDForest, JHU_UNC_GAS-StatMechPool, FRBSF_Wilson-Econometric)
     pull(model) |>
     unique()
 }

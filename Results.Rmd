@@ -1,0 +1,393 @@
+---
+title: "Allocation Score Results"
+author: "Emily Tyszka"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE, message=FALSE}
+
+library(covidHubUtils)
+library(targets)
+library(ggbump)
+library(kableExtra)
+library(ggpubr)
+library(ggtext)
+library(plotly)
+library(viridis)
+library(scoringRules)
+library(ggbump)
+library(tidyverse)
+
+### Score computation
+tar_load("truth_data")
+tar_load("forecast_data1wk")
+tar_load("forecast_data3wk")
+tar_load("alloscores1wk")
+tar_load("alloscores3wk")
+tar_load("percap1")
+tar_load("percap3")
+tar_load("resource_constraint_grid")
+tar_load("score_data1wk")
+tar_load("score_data3wk")
+
+```
+
+# Dates of Interest and Resource Constraints
+
+```{r warning = FALSE}
+
+truth_data_ca <- truth_data %>% dplyr::filter(location_name != "California" & location_name != "Los Angeles County") %>% 
+  dplyr::filter(target_end_date > as.Date("2021-10-15")) %>% 
+  dplyr::filter(target_end_date < as.Date("2022-06-15")) %>%
+  group_by(target_end_date) %>%
+  summarise(value = sum(value))
+dates_forecasts <- truth_data_ca %>% dplyr::filter(target_end_date > as.Date("2021-12-17")) %>% 
+  dplyr::filter(target_end_date < as.Date("2022-03-15"))
+date_peak <- truth_data_ca %>% dplyr::filter(target_end_date == as.Date("2022-01-15"))
+
+resourceconstraintplot <- ggplot(data=truth_data_ca, aes(x=target_end_date, y=value)) + 
+  geom_point(color="grey80") + 
+  geom_line(color="grey80") + 
+  labs(title = "Allocation Score: Weekly 90% Resource Constraints", 
+       subtitle = "Omicron Wave in California",
+       x = "MMWR Week End Date", y ="Weekly Incident Cases") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.title.x = element_text(size = 10),
+        axis.title.y = element_text(size = 10),
+        plot.title = element_text(size = 12),
+        plot.subtitle = element_text(size = 10)) + 
+  geom_point(data = dates_forecasts, aes(x=target_end_date, y=value), shape=15, size= 2.5, color="#00BFC4") + 
+  geom_segment(aes(x = as.Date("2021-12-12"), y = 30079.8, xend = as.Date("2021-12-24"), 
+                   yend = 30079.8), size=0.5, colour = "#005b5f") + # 12/18 constraint 
+  geom_segment(aes(x = as.Date("2021-12-19"), y = 49248.9, xend = as.Date("2021-12-31"), 
+                   yend = 49248.9), size=0.5, colour = "#005b5f") + # 12/25 constraint
+  geom_segment(aes(x = as.Date("2021-12-26"), y = 118342.8, xend = as.Date("2022-01-07"), 
+                   yend = 118342.8), size=0.5, colour = "#005b5f") + # 01/01 constraint
+  geom_segment(aes(x = as.Date("2022-01-02"), y = 283521.6, xend = as.Date("2022-01-14"), 
+                   yend = 283521.6), size=0.5, colour = "#005b5f") + # 01/08 constraint
+  geom_segment(aes(x = as.Date("2022-01-09"), y = 500695.2, xend = as.Date("2022-01-21"), 
+                   yend = 500695.2), size=0.5, colour = "#005b5f") + # 01/15 constraint
+  geom_segment(aes(x = as.Date("2022-01-16"), y = 464799.6, xend = as.Date("2022-01-28"), 
+                   yend = 464799.6), size=0.5, colour = "#005b5f") + # 01/22 constraint
+  geom_segment(aes(x = as.Date("2022-01-23"), y = 386233.2, xend = as.Date("2022-02-04"), 
+                   yend = 386233.2), size=0.5, colour = "#005b5f") + # 01/29 constraint
+  geom_segment(aes(x = as.Date("2022-01-30"), y = 206103.6, xend = as.Date("2022-02-11"), 
+                   yend = 206103.6), size=0.5, colour = "#005b5f") + # 02/05 constraint
+  geom_segment(aes(x = as.Date("2022-02-06"), y = 147529.8, xend = as.Date("2022-02-18"), 
+                   yend = 147529.8), size=0.5, colour = "#005b5f") + # 02/12 constraint
+  geom_segment(aes(x = as.Date("2022-02-13"), y = 71286.3, xend = as.Date("2022-02-25"), 
+                   yend = 71286.3), size=0.5, colour = "#005b5f") + # 02/19 constraint
+  geom_segment(aes(x = as.Date("2022-02-20"), y = 47598.3, xend = as.Date("2022-03-04"), 
+                   yend = 47598.3), size=0.5, colour = "#005b5f") + # 02/26 constraint
+  geom_segment(aes(x = as.Date("2022-02-27"), y = 29795.4, xend = as.Date("2022-03-11"), 
+                   yend = 29795.4), size=0.5, colour = "#005b5f") + # 03/05 constraint
+  geom_segment(aes(x = as.Date("2022-03-06"), y = 20256.3, xend = as.Date("2022-03-18"), 
+                   yend = 20256.3), size=0.5, colour = "#005b5f") # 03/12 constraint
+resourceconstraintplot
+```
+
+
+# Reported Forecasts 
+
+```{r}
+
+
+
+```
+
+# Forecasts at Each Date of Interest
+
+# Results
+
+```{r Data cleaning}
+
+# Combine all datasets
+alloscores1wk <- alloscores1wk %>% mutate(horizon = 1)
+percap1 <- percap1 %>% mutate(horizon = 1)
+alloscores3wk <- alloscores3wk %>% mutate(horizon = 3) %>%
+  mutate(filterout = paste(model,target_end_date)) %>%                       # CU-select only reporting for 56 counties in wk 3!
+  dplyr::filter(filterout != "CU-select 2021-12-18") %>% select(-filterout)
+
+percap3 <- percap3 %>% mutate(horizon = 3)
+all_alloscores_data <- rbind(alloscores1wk, alloscores3wk, percap1, percap3)
+
+# Get and merge with the 90% constraints
+resource_constraints90 <- resource_constraint_grid %>% select(target_end_date, value) %>% 
+  mutate(constraint90 = value*0.90)
+all_alloscores_data90 <- all_alloscores_data %>% merge(resource_constraints90, by = "target_end_date") %>% 
+  dplyr::filter(round(K)==round(constraint90)) %>% select(-constraint90) %>%
+  mutate(filterout = paste(model,target_end_date, horizon)) %>%                       # CU-select - remove again for some reason
+  dplyr::filter(filterout != "CU-select 2021-12-18 3") %>% select(-filterout)
+
+# Calculate AS
+all_alloscores <- all_alloscores_data90 |>
+  group_by(model, target_end_date, horizon) |>
+  mutate(components = case_when(              # This line gets rid of negatives by turning
+    components <= 0 ~ abs(`components`),      # neg values (undershoots) to absolute value
+    components > 0 ~  0                       # and pos values (overshoots) to 0. Comment 
+  )) |>                                       # out this chunk to go back to the old method.
+  summarize(alloscore = sum(components), yobs = sum(y)) |>
+  group_by(target_end_date, horizon) |>
+  mutate(nmodels = n(),
+         allo_rank = rank(alloscore, ties.method = "min"),
+         allo_rank_std = 1- (allo_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, target_end_date) |>
+  mutate(target_end_date = as.Date(target_end_date)) 
+
+# Retrieve other scores
+alloscore_models <- unique(all_alloscores$model)
+score_data_summaries1 <- score_data1wk |>
+  dplyr::filter(model %in% alloscore_models) |>
+  group_by(model, target_end_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(target_end_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, target_end_date) %>% mutate(horizon = 1)
+score_data_summaries3 <- score_data3wk |>
+  dplyr::filter(model %in% alloscore_models) |>
+  group_by(model, target_end_date) |>
+  summarize(mwis = mean(wis)) |>
+  ungroup() |>
+  group_by(target_end_date) |>
+  mutate(nmodels = n(),
+         mwis_rank = rank(mwis, ties.method = "min"),
+         mwis_rank_std = 1- (mwis_rank-1)/(nmodels-1)) |>
+  ungroup() |>
+  complete(model, target_end_date) %>% mutate(horizon = 3)
+score_data_summaries <- rbind(score_data_summaries1, score_data_summaries3)
+
+# IAS 
+all_ias <- all_alloscores_data %>%
+  group_by(model, K, horizon, target_end_date) |>
+  summarize(`Allocation score` = sum(components)) |>
+  group_by(model, horizon, target_end_date) |>
+  summarize(IAS = mean(`Allocation score`)) |> ungroup() |>
+  group_by(horizon, target_end_date) |>
+  mutate(ias_rank = rank(IAS, ties.method = "min"))
+
+all_scores <- left_join(all_alloscores, score_data_summaries,
+                      by=c("model", "target_end_date", "horizon")) 
+all_scores <- left_join(all_scores, all_ias,
+                      by=c("model", "target_end_date", "horizon")) 
+```
+
+## Summary
+```{r}
+
+scoresummarytable <- function(data, targetdateofinterest, horizonofinterest){
+summary <- data %>% dplyr::filter(target_end_date == targetdateofinterest) %>% 
+  dplyr::filter(horizon == horizonofinterest) %>% select(model, alloscore, allo_rank, mwis, mwis_rank, IAS, ias_rank)
+
+summarytable <- kable(summary, caption = paste0(targetdateofinterest,": Model scoring for the ",horizonofinterest," week horizon. Allocations conducted with a resource constraint of 90% of true need."))
+
+return(summarytable)
+}
+
+scoresummarytable(all_scores, targetdateofinterest = "2022-01-01" , horizonofinterest = "1")
+
+```
+
+
+## Alloscore Bump Charts - FIX 2 HUB ENSEMBLES ON 3 WEEK HORIZON
+```{r}
+
+bumpchart_1wk <- all_alloscores %>% dplyr::filter(horizon=="1") %>%
+  mutate(Week = as.integer(factor(target_end_date))) %>%
+  ggplot(aes(x = Week, y = allo_rank, color = model)) +
+  geom_bump(size = 1) +
+  geom_point(size = 3) + 
+  ggtitle("Allocation Score Model Rankings: 1 week horizon") +
+  scale_color_brewer(palette = "Paired") +
+  theme_bw() + 
+  ylab("Allocation Score Rank") + 
+  scale_y_continuous(breaks = c(1:15), minor_breaks = NULL, transform = "reverse") + 
+  scale_x_continuous(breaks = c(1:15), minor_breaks = NULL) 
+  
+bumpchart_1wk
+
+```
+
+```{r}
+bumpchart_3wk <- all_alloscores %>% dplyr::filter(horizon=="3") %>%
+  mutate(Week = as.integer(factor(target_end_date))) %>%
+  ggplot(aes(x = Week, y = allo_rank, color = model)) +
+  geom_bump(size = 1) +
+  geom_point(size = 3) + 
+  ggtitle("Allocation Score Model Rankings: 3 week horizon") +
+  scale_color_brewer(palette = "Paired") +
+  theme_bw() + 
+  ylab("Allocation Score Rank") + 
+  scale_y_continuous(breaks = c(1:15), minor_breaks = NULL, transform = "reverse") + 
+  scale_x_continuous(breaks = c(1:15), minor_breaks = NULL) 
+  
+bumpchart_3wk
+```
+
+## County Breakdown Graphs
+```{r}
+
+countylevelbreakdown <- function(truthdata, data90, targetdateofinterest, horizonofinterest){
+ordered_levels <- truthdata |>
+  dplyr::filter(target_end_date == targetdateofinterest, location_name != "California") |>
+  select(full_location_name, abbreviation, value) |>
+  arrange(-value)
+multiloc_dat <- data90 |>
+  dplyr::filter(target_end_date == targetdateofinterest, 
+                horizon == horizonofinterest,
+         full_location_name != "Los Angeles County, CA") |>
+  rename(allocation = x, `observed resource need` = y) |>
+  mutate(`unmet resource need` = ifelse(allocation < `observed resource need`,
+                                        `observed resource need` - allocation,
+                                        0),
+         `need met by allocated resources` = ifelse(allocation < `observed resource need`,
+                                                    allocation,
+                                                    `observed resource need`),
+         `allocation exceeding need` = ifelse(allocation < `observed resource need`,
+                                        0,
+                                        allocation - `observed resource need`)) |>
+  select(model, target_end_date, full_location_name,
+         `unmet resource need`, `need met by allocated resources`, `allocation exceeding need`) |>
+  pivot_longer(cols = c("unmet resource need", "need met by allocated resources", "allocation exceeding need")) |>
+  mutate(county = factor(full_location_name, levels=ordered_levels$full_location_name),
+         name = factor(name, levels = c("unmet resource need",
+                                        "allocation exceeding need",
+                                        "need met by allocated resources"))) |>
+  arrange(name)
+
+# reorder the model name variable via final alloscore
+as_variable <- all_scores %>% dplyr::filter(target_end_date == targetdateofinterest) %>% 
+  dplyr::filter(horizon == horizonofinterest) %>% select(model, alloscore)
+multiloc_dat <- multiloc_dat %>% 
+  merge(as_variable, by="model") %>%
+  mutate("model" = as.factor(`model`)) 
+multiloc_dat <- multiloc_dat %>%
+  mutate(model = fct_reorder(model, .x = alloscore)) 
+as_variable <- as_variable %>%
+  mutate(model = fct_reorder(model, .x = alloscore)) 
+
+alloc_plot <- ggplot(multiloc_dat, aes(x=county, y=value, fill=name)) +
+  geom_col(position="stack", alpha=1) +
+  scale_fill_manual(name=NULL, values = c("#fb6a4a", "#9ecae1", "#807dba")) +
+  theme(axis.text.x=element_text(angle=90,vjust=.5, hjust=1), legend.position = "bottom", 
+        legend.justification = c(1,1), legend.key.size = unit(0.45, "cm"), 
+        legend.background = element_rect(fill = "transparent")) +
+  ylab("Resource need and allocation") +
+  xlab(NULL) +
+  facet_grid(model~.) +
+  theme(strip.text.y = element_text(angle = 0, size=8)) + 
+  geom_text(data = as_variable, aes(x = 50, y = 2000, fill=NULL,
+                                     label = paste("AS =",round(alloscore)), 
+                                     color = NULL))
+
+return(alloc_plot)
+}
+
+
+```
+## Kendall's Tau
+
+```{r}
+
+targetdateofinterest <- "2021-12-18"
+horizonofinterest <- "3"
+
+summary <- all_scores %>% dplyr::filter(target_end_date == targetdateofinterest) %>% 
+  dplyr::filter(horizon == horizonofinterest) %>% select(model, alloscore, allo_rank, mwis, mwis_rank, IAS, ias_rank)
+
+kendall_as_mwis <- cor.test(summary$alloscore, summary$mwis, method = "kendall")
+kendall_as_mwis
+
+kendall_as_ias <- cor.test(summary$alloscore, summary$IAS, method = "kendall")
+kendall_as_ias
+
+```
+
+## Scores Over Time
+
+### AS
+
+```{r}
+
+all_scores %>% dplyr::filter(horizon=="1") %>% ggplot(aes(x=target_end_date, y=alloscore, group = model, color = model)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(title = "Allocation Scores Over Time - 1 week horizon", 
+       subtitle = "90% Resource Constraints",
+       x = "MMWR Week End Date", y ="Allocation Score") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+
+all_scores %>% dplyr::filter(horizon=="3") %>% ggplot(aes(x=target_end_date, y=alloscore, group = model, color = model)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(title = "Allocation Scores Over Time - 3 week horizon", 
+       subtitle = "90% Resource Constraints",
+       x = "MMWR Week End Date", y ="Allocation Score") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+
+```
+
+### IAS
+
+```{r}
+
+all_scores %>% dplyr::filter(horizon=="1") %>% ggplot(aes(x=target_end_date, y=IAS, group = model, color = model)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(title = "Integrated Allocation Scores Over Time - 1 week horizon", 
+       subtitle = "90% Resource Constraints",
+       x = "MMWR Week End Date", y ="Integrated Allocation Score") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+
+all_scores %>% dplyr::filter(horizon=="3") %>% ggplot(aes(x=target_end_date, y=IAS, group = model, color = model)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(title = "Integrated Allocation Scores Over Time - 3 week horizon", 
+       subtitle = "90% Resource Constraints",
+       x = "MMWR Week End Date", y ="Integrated Allocation Score") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+
+
+```
+
+### mWIS
+
+```{r}
+
+all_scores %>% dplyr::filter(horizon=="1") %>% ggplot(aes(x=target_end_date, y=mwis, group = model, color = model)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(title = "Mean WIS Over Time - 1 week horizon", 
+       subtitle = "90% Resource Constraints",
+       x = "MMWR Week End Date", y ="mWIS") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+
+all_scores %>% dplyr::filter(horizon=="3") %>% ggplot(aes(x=target_end_date, y=mwis, group = model, color = model)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(title = "Mean WIS Over Time - 3 week horizon", 
+       subtitle = "90% Resource Constraints",
+       x = "MMWR Week End Date", y ="mWIS") + 
+  theme_bw() + 
+  scale_x_date(date_breaks = "1 week") + 
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1, size = 8)) #+ scale_y_continuous(transform = "reverse")
+
+
+```
