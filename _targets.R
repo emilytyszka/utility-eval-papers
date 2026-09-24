@@ -38,7 +38,8 @@ tar_source(files = c("R/data-ingestion.R",
                      "R/percap.R",
                      "R/plot_functions.R",
                      "R/resource-constraints.R",
-                     "R/run-alloscore-match-K.R"))
+                     "R/run-alloscore-match-K.R", 
+                     "R/baseline-50.R"))
 
 datestopull <- tibble(forecast_dates = as.character(seq.Date(as.Date("2021-11-06"), as.Date("2022-03-12"), by = "7 days"))) %>% drop_na()
 datesfinal <- tibble(forecast_dates = as.character(seq.Date(as.Date("2021-12-18"), as.Date("2022-03-12"), by = "7 days"))) %>% drop_na()
@@ -124,9 +125,17 @@ setup <- list(
    name = percap3,
    command = score_per_capita_allocation(dat = alloscores3wk, pops = pops22, Kgrid = resource_constraint_grid)
  )
+ make_baseline1 <- tar_target(
+   name = baseline1,
+   command = score_baseline50_allocation(dat = alloscores1wk, forecast = forecast_data1wk, Kgrid = resource_constraint_grid)
+ )
+ 
+ make_baseline3 <- tar_target(
+   name = baseline3,
+   command = score_baseline50_allocation(dat = alloscores3wk, forecast = forecast_data3wk, Kgrid = resource_constraint_grid)
+ )
 
-
-list(setup, make_percap1, make_percap3)
+list(setup, make_percap1, make_percap3, make_baseline1, make_baseline3)
 
 
 
